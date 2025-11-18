@@ -1,0 +1,25 @@
+# Dependency directories
+/node_modules
+/jspm_packages/
+
+# Production/Build folders (usually depends on framework, e.g., React, Vue, Next)
+/dist
+/build
+/out
+
+# Logs and databases
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.stylelintcache
+
+# Environment variables (CRITICAL)
+.env
+.env.local
+.env.*.local
+
+# IDE/System Files
+.vscode/
+.idea/
+.DS_Store
