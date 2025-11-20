@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: hsl(0, 0%, 98%);
+    --color-foreground: hsl(0, 0%, 12%);
+    --color-primary: hsl(210, 80%, 45%);
+    --color-primary-foreground: hsl(0, 0%, 100%);
+    --color-secondary: hsl(210, 60%, 70%);
+    --color-secondary-foreground: hsl(0, 0%, 5%);
+    --color-tertiary: hsl(210, 40%, 94%);
+    --color-tertiary-foreground: hsl(210, 30%, 20%);
+    --color-neutral: hsl(0, 0%, 98%);
+    --color-neutral-foreground: hsl(0, 0%, 12%);
+    --color-success: hsl(145, 60%, 40%);
+    --color-success-foreground: hsl(0, 0%, 100%);
+    --color-warning: hsl(35, 90%, 55%);
+    --color-warning-foreground: hsl(0, 0%, 100%);
+    --color-accent: hsl(0, 0%, 10%);
+    --color-accent-foreground: hsl(0, 0%, 100%);
+    --color-muted: hsl(0, 0%, 95%);
+    --color-muted-foreground: hsl(0, 0%, 35%);
+    --color-card: hsl(0, 0%, 100%);
+    --color-card-foreground: hsl(0, 0%, 12%);
+    --color-border: hsl(0, 0%, 90%);
+    --color-input: hsl(0, 0%, 90%);
+    --color-ring: hsl(210, 80%, 50%);
+    --font-sans: "DM Sans", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans);
+  }
+}
