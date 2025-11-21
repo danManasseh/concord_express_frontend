@@ -2,74 +2,115 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Package,
-  Plus,
-  Search,
-  Bell,
-  User,
-  TrendingUp,
-  CheckCircle,
-  Clock,
-} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Package, Search, TrendingUp, CheckCircle, Plus, Loader2, Bell, User, LogOut } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
+import parcelService from '@/services/parcel.service';
+import { Parcel } from '@/types/parcel.types';
 
 export default function MyDeliveriesPage() {
   const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+
+  const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [filteredParcels, setFilteredParcels] = useState<Parcel[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [orders, setOrders] = useState<any[]>([]);
-  const [notificationCount, setNotificationCount] = useState(3);
 
-  // Check if user is logged in
-  const user = localStorage.getItem('user');
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
-
+  // Redirect if not authenticated
   useEffect(() => {
-    // Get orders from localStorage
-    const storedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-    setOrders(storedOrders);
-  }, []);
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
+  // Fetch user's parcels
+  useEffect(() => {
+    const fetchParcels = async () => {
+      try {
+        const data = await parcelService.getUserParcels();
+        setParcels(data);
+        setFilteredParcels(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load deliveries');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchParcels();
+    }
+  }, [user]);
+
+  // Filter parcels
+  useEffect(() => {
+    let filtered = [...parcels];
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((p) => p.status === statusFilter);
+    }
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (p) =>
+          p.tracking_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.recipient_name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredParcels(filtered);
+  }, [searchQuery, statusFilter, parcels]);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  if (!user) return null;
+
+  // Calculate stats
+  const stats = {
+    total: parcels.length,
+    pending: parcels.filter((p) => p.payment_status === 'unpaid').length,
+    inTransit: parcels.filter((p) => p.status === 'in_transit').length,
+    delivered: parcels.filter((p) => p.status === 'delivered').length,
+  };
+
+  // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'In Transit':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'Delivered':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'Failed':
-        return 'bg-red-100 text-red-800 border-red-300';
+      case 'created':
+        return 'bg-blue-100 text-blue-700';
+      case 'in_transit':
+        return 'bg-orange-100 text-orange-700';
+      case 'arrived':
+        return 'bg-purple-100 text-purple-700';
+      case 'delivered':
+        return 'bg-green-100 text-green-700';
+      case 'failed':
+        return 'bg-red-100 text-red-700';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.trackingId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.recipient.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const stats = {
-    total: orders.length,
-    pending: orders.filter((o) => o.status === 'Pending').length,
-    inTransit: orders.filter((o) => o.status === 'In Transit').length,
-    delivered: orders.filter((o) => o.status === 'Delivered').length,
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-100 text-green-700';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'unpaid':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
   };
 
   return (
@@ -82,22 +123,16 @@ export default function MyDeliveriesPage() {
               <Package className="h-6 w-6 text-primary" />
               <h1 className="text-xl sm:text-2xl font-bold text-foreground">Concord Express</h1>
             </Link>
-            <div className="flex items-center gap-3">
-              <Link to="/notifications">
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5" />
-                  {notificationCount > 0 && (
-                    <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                      {notificationCount}
-                    </span>
-                  )}
-                </Button>
-              </Link>
-              <Link to="/profile">
-                <Button variant="ghost" size="icon">
-                  <User className="h-5 w-5" />
-                </Button>
-              </Link>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Button variant="ghost" size="icon" onClick={() => navigate('/notifications')}>
+                <Bell className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
+                <User className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
+                <LogOut className="h-5 w-5" />
+              </Button>
             </div>
           </div>
         </div>
@@ -105,27 +140,21 @@ export default function MyDeliveriesPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-              My Deliveries
-            </h1>
-            <p className="text-muted-foreground">
-              Track and manage all your parcel deliveries
-            </p>
-          </div>
-          <Button
-            onClick={() => navigate('/create-delivery')}
-            className="w-full sm:w-auto"
-          >
+        <div className="mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">My Deliveries</h2>
+          <p className="text-muted-foreground">Track and manage all your parcel deliveries</p>
+        </div>
+
+        {/* Create Button */}
+        <div className="mb-6">
+          <Button onClick={() => navigate('/create-delivery')} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Create New Delivery
           </Button>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -140,10 +169,8 @@ export default function MyDeliveriesPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pending
-              </CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">{stats.pending}</div>
@@ -175,129 +202,114 @@ export default function MyDeliveriesPage() {
           </Card>
         </div>
 
-        {/* Filters and Orders List */}
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        {/* All Deliveries */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl font-bold text-foreground">
-              All Deliveries
-            </CardTitle>
+            <CardTitle className="text-xl font-bold text-foreground">All Deliveries</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <div className="relative flex-1">
+            {/* Search and Filter */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  type="text"
                   placeholder="Search by tracking ID or recipient..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
+                <SelectTrigger className="w-full sm:w-[200px] h-11">
+                  <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="In Transit">In Transit</SelectItem>
-                  <SelectItem value="Delivered">Delivered</SelectItem>
-                  <SelectItem value="Failed">Failed</SelectItem>
+                  <SelectItem value="created">Payment Pending</SelectItem>
+                  <SelectItem value="in_transit">In Transit</SelectItem>
+                  <SelectItem value="arrived">Arrived</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Orders List */}
-            {filteredOrders.length === 0 ? (
+            {/* Deliveries List */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : filteredParcels.length === 0 ? (
               <div className="text-center py-12">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  No deliveries found
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  {orders.length === 0
-                    ? "You haven't created any deliveries yet"
-                    : 'Try adjusting your search or filters'}
+                <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery || statusFilter !== 'all'
+                    ? 'No deliveries found matching your filters'
+                    : 'No deliveries yet'}
                 </p>
-                {orders.length === 0 && (
+                {!searchQuery && statusFilter === 'all' && (
                   <Button onClick={() => navigate('/create-delivery')}>
-                    <Plus className="h-4 w-4 mr-2" />
                     Create Your First Delivery
                   </Button>
                 )}
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredOrders.map((order) => (
+                {filteredParcels.map((parcel) => (
                   <div
-                    key={order.trackingId}
-                    className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
+                    key={parcel.id}
+                    className="border border-border rounded-lg p-4 hover:border-primary transition-colors cursor-pointer"
+                    onClick={() => navigate(`/track?code=${parcel.tracking_code}`)}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Tracking ID</p>
-                            <p className="font-mono font-bold text-foreground">
-                              {order.trackingId}
-                            </p>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className={getStatusColor(order.status)}
-                          >
-                            {order.status}
-                          </Badge>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Recipient</p>
-                            <p className="text-foreground">{order.recipient.name}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Destination</p>
-                            <p className="text-foreground">{order.destinationStation}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Amount</p>
-                            <p className="text-foreground">
-                              {order.package?.amount !== undefined
-                                ? `$${order.package.amount.toFixed(2)}`
-                                : 'N/A'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Payment</p>
-                            <p className="text-foreground capitalize">{order.paymentResponsibility}</p>
-                          </div>
-                        </div>
-
-                        <div className="text-sm">
-                          <p className="text-xs text-muted-foreground">Created</p>
-                          <p className="text-foreground">
-                            {new Date(order.createdAt).toLocaleDateString()}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="font-semibold text-foreground">
+                            {parcel.tracking_code}
                           </p>
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full ${getStatusColor(
+                              parcel.status
+                            )}`}
+                          >
+                            {parcel.status.replace('_', ' ').toUpperCase()}
+                          </span>
                         </div>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          <span className="font-medium">To:</span> {parcel.recipient_name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium">Destination:</span>{' '}
+                          {parcel.destination_station_name}
+                        </p>
                       </div>
-
-                      <div className="flex sm:flex-col gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/track?id=${order.trackingId}`)}
-                          className="flex-1 sm:flex-none"
+                      <div className="flex flex-col items-start sm:items-end gap-2">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${getPaymentStatusColor(
+                            parcel.payment_status
+                          )}`}
                         >
-                          Track
-                        </Button>
+                          {parcel.payment_status.toUpperCase()}
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(parcel.created_at).toLocaleDateString()}
+                        </p>
                         <Button
-                          variant="outline"
                           size="sm"
-                          onClick={() =>
-                            navigate(`/order-confirmation/${order.trackingId}`)
-                          }
-                          className="flex-1 sm:flex-none"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/track?code=${parcel.tracking_code}`
+                            );
+                          }}
                         >
                           View Label
                         </Button>

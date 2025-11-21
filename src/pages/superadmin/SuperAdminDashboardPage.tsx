@@ -3,64 +3,109 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Package,
-  TrendingUp,
-  CheckCircle,
-  Clock,
-  Users,
   MapPin,
+  Package,
   DollarSign,
-  Plus,
-  List,
-  UserCog,
-  Bell, // Ensure Bell is imported for the button
+  TrendingUp,
+  Users,
+  Settings,
+  BarChart3,
+  Bell,
+  Loader2,
 } from 'lucide-react';
-import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader'; // Import reusable header
+import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
+import { useAuthStore } from '@/stores/authStore';
+import adminService from '@/services/admin.service';
 
 export default function SuperAdminDashboardPage() {
   const navigate = useNavigate();
-  const [superAdminData, setSuperAdminData] = useState<any>(null);
+  const { user } = useAuthStore();
 
+  const [stats, setStats] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Redirect if not superadmin
   useEffect(() => {
-    const superadmin = localStorage.getItem('superadmin');
-    if (!superadmin) {
+    if (!user || user.role !== 'superadmin') {
       navigate('/superadmin/login');
-      return;
     }
-    setSuperAdminData(JSON.parse(superadmin));
-  }, [navigate]);
+  }, [user, navigate]);
 
-  if (!superAdminData) return null;
+  // Fetch dashboard stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await adminService.getSuperAdminStats();
+        setStats(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  // Mock global stats
-  const stats = {
-    activeStations: 6,
-    totalParcels: 250,
-    totalRevenue: 15780.50,
-    deliverySuccessRate: 96.2,
+    if (user) {
+      fetchStats();
+    }
+  }, [user]);
+
+  if (!user) return null;
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'parcel_created':
+        return <Package className="h-5 w-5 text-blue-600" />;
+      case 'parcel_delivered':
+        return <TrendingUp className="h-5 w-5 text-green-600" />;
+      case 'admin_created':
+        return <Users className="h-5 w-5 text-purple-600" />;
+      default:
+        return <Bell className="h-5 w-5 text-gray-600" />;
+    }
+  };
+
+  const getActivityBgColor = (type: string) => {
+    switch (type) {
+      case 'parcel_created':
+        return 'bg-blue-100';
+      case 'parcel_delivered':
+        return 'bg-green-100';
+      case 'admin_created':
+        return 'bg-purple-100';
+      default:
+        return 'bg-gray-100';
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <SuperAdminHeader superAdminData={superAdminData} notificationCount={5} /> {/* Use reusable header */}
+      <SuperAdminHeader adminData={user} notificationCount={5} />
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-            Welcome, {superAdminData.name}
+            Welcome, {user.name}
           </h2>
           <p className="text-muted-foreground">
             Global overview of Concord Express operations
           </p>
         </div>
 
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Button
+            variant="outline"
             onClick={() => navigate('/superadmin/stations')}
-            className="h-20 text-lg"
+            className="h-20 text-base"
           >
             <MapPin className="h-5 w-5 mr-2" />
             Manage Stations
@@ -68,31 +113,35 @@ export default function SuperAdminDashboardPage() {
           <Button
             variant="outline"
             onClick={() => navigate('/superadmin/admins')}
-            className="h-20 text-lg"
+            className="h-20 text-base"
           >
-            <UserCog className="h-5 w-5 mr-2" />
+            <Users className="h-5 w-5 mr-2" />
             Manage Station Admins
           </Button>
           <Button
             variant="outline"
             onClick={() => navigate('/superadmin/parcels')}
-            className="h-20 text-lg"
+            className="h-20 text-base"
           >
-            <List className="h-5 w-5 mr-2" />
+            <Package className="h-5 w-5 mr-2" />
             Global Parcel View
           </Button>
           <Button
             variant="outline"
             onClick={() => navigate('/superadmin/users')}
-            className="h-20 text-lg"
+            className="h-20 text-base"
           >
             <Users className="h-5 w-5 mr-2" />
             User Overview
           </Button>
+        </div>
+
+        {/* Additional Actions */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <Button
             variant="outline"
             onClick={() => navigate('/superadmin/payments')}
-            className="h-20 text-lg"
+            className="h-16"
           >
             <DollarSign className="h-5 w-5 mr-2" />
             Global Payments
@@ -100,125 +149,128 @@ export default function SuperAdminDashboardPage() {
           <Button
             variant="outline"
             onClick={() => navigate('/superadmin/reports')}
-            className="h-20 text-lg"
+            className="h-16"
           >
-            <TrendingUp className="h-5 w-5 mr-2" />
+            <BarChart3 className="h-5 w-5 mr-2" />
             Analytics & Reports
           </Button>
           <Button
             variant="outline"
             onClick={() => navigate('/superadmin/notifications')}
-            className="h-20 text-lg"
+            className="h-16"
           >
             <Bell className="h-5 w-5 mr-2" />
             Broadcast Message
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate('/superadmin/profile')}
-            className="h-20 text-lg"
-          >
-            <UserCog className="h-5 w-5 mr-2" /> {/* Reusing UserCog for profile for now */}
-            My Profile
-          </Button>
         </div>
 
-        {/* Global Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Stations
-              </CardTitle>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{stats.activeStations}</div>
-            </CardContent>
-          </Card>
+        {/* Stats Cards */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : stats ? (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Active Stations
+                  </CardTitle>
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-foreground">
+                    {stats.stats.active_stations}
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Parcels
-              </CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{stats.totalParcels}</div>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Parcels
+                  </CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-foreground">
+                    {stats.stats.total_parcels}
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">${stats.totalRevenue.toFixed(2)}</div>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Revenue
+                  </CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-foreground">
+                    GHS {stats.stats.total_revenue.toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Delivery Success Rate
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{stats.deliverySuccessRate}%</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Global Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-foreground">
-              Recent Global Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Package className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    New parcel TRK001008 created at Station E - North End
-                  </p>
-                  <p className="text-xs text-muted-foreground">10 minutes ago</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    Parcel TRK001004 delivered from Station C to Station A
-                  </p>
-                  <p className="text-xs text-muted-foreground">30 minutes ago</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    New Station Admin 'Jane Doe' created for Station F
-                  </p>
-                  <p className="text-xs text-muted-foreground">2 hours ago</p>
-                </div>
-              </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Delivery Success Rate
+                  </CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-foreground">
+                    {stats.stats.delivery_success_rate}%
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Recent Global Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-bold text-foreground">
+                  Recent Global Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.recent_activity.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No recent activity
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {stats.recent_activity.map((activity: any, index: number) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg"
+                      >
+                        <div
+                          className={`h-10 w-10 rounded-full ${getActivityBgColor(
+                            activity.type
+                          )} flex items-center justify-center`}
+                        >
+                          {getActivityIcon(activity.type)}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground">
+                            {activity.message}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(activity.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
       </div>
     </div>
   );

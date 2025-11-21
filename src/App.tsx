@@ -27,44 +27,216 @@ import SuperAdminNotificationsPage from './pages/superadmin/SuperAdminNotificati
 import SuperAdminProfilePage from './pages/superadmin/SuperAdminProfilePage';
 import SuperAdminAnalyticsReportsPage from './pages/superadmin/SuperAdminAnalyticsReportsPage';
 import SuperAdminUserOverviewPage from './pages/superadmin/SuperAdminUserOverviewPage';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Customer Portal */}
+        {/* Public Routes */}
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/create-delivery" element={<CreateDeliveryPage />} />
-        <Route path="/order-confirmation/:trackingId" element={<OrderConfirmationPage />} />
-        <Route path="/my-deliveries" element={<MyDeliveriesPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
         <Route path="/track" element={<TrackingPage />} />
+
+        {/* Customer Portal */}
+
+          <Route
+          path="/create-delivery"
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <CreateDeliveryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/order-confirmation/:trackingId"
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <OrderConfirmationPage />
+            </ProtectedRoute>
+          }
+          />
+        <Route
+          path="/my-deliveries"
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <MyDeliveriesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <NotificationsPage />
+            </ProtectedRoute>} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <ProfilePage />
+            </ProtectedRoute>
+          } />
         
         {/* Station Admin Panel */}
         <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-        <Route path="/admin/parcels" element={<AdminParcelManagementPage />} />
-        <Route path="/admin/parcels/:trackingId" element={<AdminParcelDetailsPage />} />
-        <Route path="/admin/create-parcel" element={<AdminCreateParcelPage />} />
-        <Route path="/admin/bus-arrival" element={<AdminBusArrivalPage />} />
-        <Route path="/admin/payments" element={<AdminPaymentRecordsPage />} />
-        <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
-        <Route path="/admin/profile" element={<AdminProfilePage />} />
+
+        <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminDashboardPage />
+          </ProtectedRoute>
+        }/>
+
+        <Route
+          path="/admin/parcels"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminParcelManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/parcels/:trackingId"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminParcelDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/create-parcel"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminCreateParcelPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/bus-arrival"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminBusArrivalPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/payments"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminPaymentRecordsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/notifications"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminNotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminProfilePage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Super Admin Panel */}
         <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
-        <Route path="/superadmin/dashboard" element={<SuperAdminDashboardPage />} />
-        <Route path="/superadmin/stations" element={<SuperAdminStationManagementPage />} />
-        <Route path="/superadmin/admins" element={<SuperAdminAdminManagementPage />} />
-        <Route path="/superadmin/parcels" element={<SuperAdminGlobalParcelOverviewPage />} />
-        <Route path="/superadmin/payments" element={<SuperAdminGlobalPaymentRecordsPage />} />
-        <Route path="/superadmin/notifications" element={<SuperAdminNotificationsPage />} /> {/* New route */}
-        <Route path="/superadmin/profile" element={<SuperAdminProfilePage />} /> {/* New route */}
-        <Route path="/superadmin/reports" element={<SuperAdminAnalyticsReportsPage />} /> {/* New route */}
-				<Route path="/superadmin/users" element={<SuperAdminUserOverviewPage />} />
+
+        <Route
+          path="/superadmin/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/stations"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminStationManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/admins"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminAdminManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/parcels"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminGlobalParcelOverviewPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/payments"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminGlobalPaymentRecordsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/notifications"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminNotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/profile"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/reports"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminAnalyticsReportsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/superadmin/users"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <SuperAdminUserOverviewPage />
+            </ProtectedRoute>
+          }
+        />
+
       </Routes>
     </Router>
   );

@@ -24,3 +24,14 @@ declare module '*.jpeg' {
   const content: string;
   export default content;
 }
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL: string;
+  readonly VITE_API_URL: string;
+    // Add other environment variables here that start with VITE_
+    // Example:
+    // readonly VITE_ANALYTICS_KEY: string;
+}
+
+interface ImportMeta {
+    readonly env: ImportMetaEnv;
+}

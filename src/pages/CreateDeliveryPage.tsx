@@ -1,48 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Package, Upload, X } from 'lucide-react';
-
-const stations = [
-  'Station A - Downtown',
-  'Station B - Uptown',
-  'Station C - East Side',
-  'Station D - West Side',
-  'Station E - North End',
-  'Station F - South District',
-];
+import { ArrowLeft, Package, Upload, X, Loader2 } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
+import parcelService from '@/services/parcel.service';
+import stationService from '@/services/station.service';
+import { Station } from '@/types/user.types';
+import { CreateParcelRequest, DeliveryType, PaymentResponsibility } from '@/types/parcel.types';
 
 export default function CreateDeliveryPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   
-  // Check if user is logged in
-  const user = localStorage.getItem('user');
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
-  // Sender Information
-  const [senderName, setSenderName] = useState('');
-  const [senderPhone, setSenderPhone] = useState('');
-  const [senderEmail, setSenderEmail] = useState('');
+  // States
+  const [stations, setStations] = useState<Station[]>([]);
+  const [isLoadingStations, setIsLoadingStations] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  // Sender Information (pre-fill from user data)
+  const [senderName, setSenderName] = useState(user?.name || '');
+  const [senderPhone, setSenderPhone] = useState(user?.phone || '');
+  const [senderAddress, setSenderAddress] = useState('');
   
   // Recipient Information
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
   
   // Stations
   const [originStation, setOriginStation] = useState('');
@@ -51,15 +48,32 @@ export default function CreateDeliveryPage() {
   // Package Details
   const [description, setDescription] = useState('');
   const [weight, setWeight] = useState('');
-  const [amount, setAmount] = useState(''); // New: Amount to pay
-  const [deliveryType, setDeliveryType] = useState('standard');
+  const [amount, setAmount] = useState('');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('standard');
   
   // Payment
-  const [paymentResponsibility, setPaymentResponsibility] = useState('sender');
+  const [paymentResponsibility, setPaymentResponsibility] = useState<PaymentResponsibility>('sender');
   
   // Photo Upload
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
+
+  // Fetch stations on mount
+  useEffect(() => {
+    const fetchStations = async () => {
+      try {
+        const data = await stationService.getStations();
+        setStations(data);
+      } catch (err) {
+        console.error('Failed to load stations:', err);
+        setError('Failed to load stations. Please refresh the page.');
+      } finally {
+        setIsLoadingStations(false);
+      }
+    };
+
+    fetchStations();
+  }, []);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,50 +92,54 @@ export default function CreateDeliveryPage() {
     setPhotoPreview('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    let paymentStatusValue = 'Pending'; // Default for customer portal
-    // If sender pays, it's still pending until confirmed by admin (e.g., cash at station)
-    // If receiver pays, it's pending until confirmed by admin
+    setError('');
+    setIsSubmitting(true);
 
-    const orderData = {
-      trackingId: `TRK${Date.now()}`,
-      sender: {
-        name: senderName,
-        phone: senderPhone,
-        email: senderEmail,
-      },
-      recipient: {
-        name: recipientName,
-        phone: recipientPhone,
-        email: recipientEmail,
-      },
-      originStation,
-      destinationStation,
-      package: {
-        description,
-        weight: weight || 'Not specified',
-        amount: parseFloat(amount), // Store as number
-        deliveryType,
-        photo: photoPreview,
-      },
-      paymentResponsibility,
-      paymentStatus: paymentStatusValue, // Always pending from customer side
-      status: 'Payment Pending', // Initial status for customer orders
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      // Prepare parcel data matching backend serializer
+      const parcelData: CreateParcelRequest = {
+        sender_name: senderName,
+        sender_phone: senderPhone,
+        sender_address: senderAddress,
+        recipient_name: recipientName,
+        recipient_phone: recipientPhone,
+        recipient_address: recipientAddress,
+        origin_station: originStation,
+        destination_station: destinationStation,
+        description: description,
+        item_count: 1,
+        weight: weight ? parseFloat(weight) : undefined,
+        declared_value: parseFloat(amount),
+        delivery_type: deliveryType,
+        payment_status: 'unpaid', // Customer orders start as unpaid
+        payment_responsibility: paymentResponsibility,
+      };
 
-    console.log('Order created:', orderData);
-    
-    // Save to localStorage (temporary - will be replaced with API)
-    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-    orders.push(orderData);
-    localStorage.setItem('orders', JSON.stringify(orders));
-    
-    // Navigate to confirmation page
-    navigate(`/order-confirmation/${orderData.trackingId}`);
+      // Create parcel
+      const createdParcel = await parcelService.createParcel(parcelData);
+
+      // Upload photo if exists
+      if (photo) {
+        try {
+          await parcelService.uploadPhoto(createdParcel.id, photo);
+        } catch (photoErr) {
+          console.error('Failed to upload photo:', photoErr);
+          // Don't fail the entire order if photo upload fails
+        }
+      }
+
+      // Navigate to confirmation page
+      navigate(`/order-confirmation/${createdParcel.tracking_code}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create order. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -163,6 +181,13 @@ export default function CreateDeliveryPage() {
             </p>
           </div>
 
+          {/* Error Alert */}
+          {error && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Sender Information */}
             <Card>
@@ -181,6 +206,7 @@ export default function CreateDeliveryPage() {
                     value={senderName}
                     onChange={(e) => setSenderName(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
@@ -195,19 +221,22 @@ export default function CreateDeliveryPage() {
                     value={senderPhone}
                     onChange={(e) => setSenderPhone(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="senderEmail">
-                    Email <span className="text-muted-foreground text-xs">(Optional)</span>
+                  <Label htmlFor="senderAddress">
+                    Address <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="senderEmail"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={senderEmail}
-                    onChange={(e) => setSenderEmail(e.target.value)}
+                    id="senderAddress"
+                    type="text"
+                    placeholder="Enter sender's address"
+                    value={senderAddress}
+                    onChange={(e) => setSenderAddress(e.target.value)}
+                    required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
@@ -231,6 +260,7 @@ export default function CreateDeliveryPage() {
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
@@ -245,19 +275,22 @@ export default function CreateDeliveryPage() {
                     value={recipientPhone}
                     onChange={(e) => setRecipientPhone(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="recipientEmail">
-                    Email <span className="text-muted-foreground text-xs">(Optional)</span>
+                  <Label htmlFor="recipientAddress">
+                    Address <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="recipientEmail"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={recipientEmail}
-                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    id="recipientAddress"
+                    type="text"
+                    placeholder="Enter recipient's address"
+                    value={recipientAddress}
+                    onChange={(e) => setRecipientAddress(e.target.value)}
+                    required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
@@ -274,14 +307,19 @@ export default function CreateDeliveryPage() {
                   <Label htmlFor="originStation">
                     Origin Station <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={originStation} onValueChange={setOriginStation} required>
+                  <Select 
+                    value={originStation} 
+                    onValueChange={setOriginStation} 
+                    required
+                    disabled={isLoadingStations || isSubmitting}
+                  >
                     <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select origin station" />
+                      <SelectValue placeholder={isLoadingStations ? "Loading stations..." : "Select origin station"} />
                     </SelectTrigger>
                     <SelectContent>
                       {stations.map((station) => (
-                        <SelectItem key={station} value={station}>
-                          {station}
+                        <SelectItem key={station.id} value={station.id}>
+                          {station.name} ({station.code})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -291,14 +329,19 @@ export default function CreateDeliveryPage() {
                   <Label htmlFor="destinationStation">
                     Destination Station <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={destinationStation} onValueChange={setDestinationStation} required>
+                  <Select 
+                    value={destinationStation} 
+                    onValueChange={setDestinationStation} 
+                    required
+                    disabled={isLoadingStations || isSubmitting}
+                  >
                     <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select destination station" />
+                      <SelectValue placeholder={isLoadingStations ? "Loading stations..." : "Select destination station"} />
                     </SelectTrigger>
                     <SelectContent>
                       {stations.map((station) => (
-                        <SelectItem key={station} value={station}>
-                          {station}
+                        <SelectItem key={station.id} value={station.id}>
+                          {station.name} ({station.code})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -323,11 +366,12 @@ export default function CreateDeliveryPage() {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="min-h-[100px]"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="weight" className="text-sm font-medium">
+                  <Label htmlFor="weight">
                     Weight (kg) <span className="text-muted-foreground text-xs">(Optional)</span>
                   </Label>
                   <Input
@@ -337,21 +381,23 @@ export default function CreateDeliveryPage() {
                     placeholder="Enter package weight"
                     value={weight}
                     onChange={(e) => setWeight(e.target.value)}
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="amount">
-                    Amount to Pay ($) <span className="text-red-500">*</span>
+                    Declared Value (GHS) <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="amount"
                     type="number"
                     step="0.01"
-                    placeholder="Enter amount"
+                    placeholder="Enter package value"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
@@ -359,7 +405,11 @@ export default function CreateDeliveryPage() {
                   <Label className="text-sm font-medium">
                     Delivery Type <span className="text-red-500">*</span>
                   </Label>
-                  <RadioGroup value={deliveryType} onValueChange={setDeliveryType}>
+                  <RadioGroup 
+                    value={deliveryType} 
+                    onValueChange={(value) => setDeliveryType(value as DeliveryType)}
+                    disabled={isSubmitting}
+                  >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="standard" id="standard" />
                       <Label htmlFor="standard" className="font-normal cursor-pointer">
@@ -373,8 +423,8 @@ export default function CreateDeliveryPage() {
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="same-day" id="same-day" />
-                      <Label htmlFor="same-day" className="font-normal cursor-pointer">
+                      <RadioGroupItem value="same_day" id="same_day" />
+                      <Label htmlFor="same_day" className="font-normal cursor-pointer">
                         Same Day Delivery
                       </Label>
                     </div>
@@ -393,6 +443,7 @@ export default function CreateDeliveryPage() {
                         type="file"
                         accept="image/*"
                         onChange={handlePhotoChange}
+                        disabled={isSubmitting}
                         className="hidden"
                       />
                       <label htmlFor="photo" className="cursor-pointer">
@@ -414,6 +465,7 @@ export default function CreateDeliveryPage() {
                         variant="destructive"
                         size="icon"
                         onClick={removePhoto}
+                        disabled={isSubmitting}
                         className="absolute top-2 right-2"
                       >
                         <X className="h-4 w-4" />
@@ -434,7 +486,11 @@ export default function CreateDeliveryPage() {
                   <Label>
                     Who will pay for the delivery? <span className="text-red-500">*</span>
                   </Label>
-                  <RadioGroup value={paymentResponsibility} onValueChange={setPaymentResponsibility}>
+                  <RadioGroup 
+                    value={paymentResponsibility} 
+                    onValueChange={(value) => setPaymentResponsibility(value as PaymentResponsibility)}
+                    disabled={isSubmitting}
+                  >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="sender" id="sender" />
                       <Label htmlFor="sender" className="font-normal cursor-pointer">
@@ -442,9 +498,9 @@ export default function CreateDeliveryPage() {
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="receiver" id="receiver" />
-                      <Label htmlFor="receiver" className="font-normal cursor-pointer">
-                        Receiver (Recipient will pay)
+                      <RadioGroupItem value="recipient" id="recipient" />
+                      <Label htmlFor="recipient" className="font-normal cursor-pointer">
+                        Recipient (Recipient will pay)
                       </Label>
                     </div>
                   </RadioGroup>
@@ -461,15 +517,24 @@ export default function CreateDeliveryPage() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('/my-deliveries')}
+                disabled={isSubmitting}
                 className="h-11 flex-1"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                disabled={isSubmitting || isLoadingStations}
                 className="h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                Create Order
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating Order...
+                  </>
+                ) : (
+                  'Create Order'
+                )}
               </Button>
             </div>
           </form>

@@ -3,20 +3,46 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Package } from 'lucide-react';
+import { ArrowLeft, Package, Loader2 } from 'lucide-react';
+import authService from '@/services/auth.service';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  
   const navigate = useNavigate();
+  const { setUser } = useAuthStore();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login:', { email, password });
-    // TODO: Implement actual login logic
-    // For now, simulate successful login
-    localStorage.setItem('user', JSON.stringify({ email, name: 'John Doe', phone: '+1 (555) 123-4567' }));
-    navigate('/my-deliveries');
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await authService.login({ email, password });
+      
+      // Update Zustand store
+      setUser(response.user);
+      
+      // Redirect based on role
+      switch (response.user.role) {
+        case 'superadmin':
+          navigate('/superadmin/dashboard');
+          break;
+        case 'admin':
+          navigate('/admin/dashboard');
+          break;
+        default:
+          navigate('/my-deliveries');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -48,6 +74,13 @@ export default function LoginPage() {
           </div>
 
           <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm">
+            {/* Error Alert */}
+            {error && (
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
@@ -60,6 +93,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={isLoading}
                   className="h-11"
                 />
               </div>
@@ -75,15 +109,24 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={isLoading}
                   className="h-11"
                 />
               </div>
 
               <Button
                 type="submit"
+                disabled={isLoading}
                 className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                Login
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
+                  'Login'
+                )}
               </Button>
             </form>
 
