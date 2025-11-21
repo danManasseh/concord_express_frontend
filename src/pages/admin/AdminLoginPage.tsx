@@ -3,150 +3,194 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { ArrowLeft, Package, Shield } from 'lucide-react';
-
-const stations = [
-  { id: 'station-a', name: 'Station A - Downtown' },
-  { id: 'station-b', name: 'Station B - Uptown' },
-  { id: 'station-c', name: 'Station C - East Side' },
-  { id: 'station-d', name: 'Station D - West Side' },
-  { id: 'station-e', name: 'Station E - North End' },
-  { id: 'station-f', name: 'Station F - South District' },
-];
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Building2, Loader2, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import authService from '@/services/auth.service';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedStation, setSelectedStation] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { setUser } = useAuthStore();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedStation) {
-      alert('Please select a station');
+    setError('');
+
+    // Validation
+    if (!phone.trim()) {
+      setError('Phone number is required');
       return;
     }
 
-    // Mock admin login - store admin data with station info
-    const adminData = {
-      email,
-      name: 'Station Admin',
-      role: 'station_admin',
-      stationId: selectedStation,
-      stationName: stations.find(s => s.id === selectedStation)?.name,
-    };
-    
-    localStorage.setItem('admin', JSON.stringify(adminData));
-    navigate('/admin/dashboard');
+    if (!password) {
+      setError('Password is required');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await authService.login({ phone, password });
+      
+      // Check if the logged-in user is an admin
+      if (response.user.role !== 'admin') {
+        setError('Access denied. Station Admin credentials required.');
+        authService.logout();
+        setIsLoading(false);
+        return;
+      }
+
+      // Update Zustand store
+      setUser(response.user);
+      
+      toast({
+        title: 'Login Successful',
+        description: `Welcome back, ${response.user.name}!`,
+      });
+
+      navigate('/admin/dashboard');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(errorMessage);
+      
+      toast({
+        title: 'Login Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="w-full bg-card border-b border-border">
-        <div className="container mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <Package className="h-6 w-6 text-primary" />
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Concord Express</h1>
-            </Link>
-            <Link to="/">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 mb-6 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Home
+        </Link>
 
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
-              <Shield className="h-8 w-8 text-primary" />
+        <Card className="shadow-xl border-0">
+          <CardHeader className="space-y-3 text-center pb-6">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Building2 className="h-8 w-8 text-white" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Station Admin Login</h2>
-            <p className="text-muted-foreground">Access your station management panel</p>
-          </div>
+            <div>
+              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
+                Station Admin Portal
+              </CardTitle>
+              <CardDescription className="mt-2">
+                Access your station management dashboard
+              </CardDescription>
+            </div>
+          </CardHeader>
 
-          <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="station" className="text-sm font-medium">
-                  Station <span className="text-red-500">*</span>
-                </Label>
-                <Select value={selectedStation} onValueChange={setSelectedStation} required>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select your station" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stations.map((station) => (
-                      <SelectItem key={station.id} value={station.id}>
-                        {station.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">{error}</span>
+                </div>
+              )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email Address
-                </Label>
+                <Label htmlFor="phone">Phone Number</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  id="phone"
+                  type="tel"
+                  placeholder="0241234567"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setError('');
+                  }}
+                  disabled={isLoading}
                   className="h-11"
+                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </Label>
+                <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError('');
+                  }}
+                  disabled={isLoading}
                   className="h-11"
+                  required
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+                className="w-full h-11 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700"
+                disabled={isLoading}
               >
-                Login to Dashboard
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Sign In
+                  </>
+                )}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Customer?{' '}
-                <Link to="/login" className="text-primary font-medium hover:underline">
-                  Login here
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">
+                  Station Admin Access
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-center text-sm">
+              <p className="text-gray-600">
+                Super Admin?{' '}
+                <Link
+                  to="/superadmin/login"
+                  className="text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  Super Admin Login
+                </Link>
+              </p>
+              <p className="text-gray-600">
+                Customer Portal:{' '}
+                <Link
+                  to="/login"
+                  className="text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  Customer Login
                 </Link>
               </p>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

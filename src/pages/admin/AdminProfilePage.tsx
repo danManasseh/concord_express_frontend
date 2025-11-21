@@ -5,32 +5,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft,
   Save,
+  LogOut,
+  Loader2,
+  ShieldAlert,
   MapPin,
-  LogOut, // Added LogOut icon import
+  Building,
 } from 'lucide-react';
 import AdminHeader from '@/components/admin/AdminHeader';
+import { useAuthStore } from '@/stores/authStore';
+import profileService from '@/services/profileService';
 
 export default function AdminProfilePage() {
   const navigate = useNavigate();
-  const [adminData, setAdminData] = useState<any>(null);
+  const { toast } = useToast();
+  const { user, setUser, logout } = useAuthStore();
 
-  useEffect(() => {
-    const admin = localStorage.getItem('admin');
-    if (!admin) {
-      navigate('/admin/login');
-      return;
-    }
-    const parsedAdmin = JSON.parse(admin);
-    setAdminData(parsedAdmin);
-
-    // Initialize editable fields from adminData
-    setName(parsedAdmin.name || '');
-    setEmail(parsedAdmin.email || '');
-    setPhone(parsedAdmin.phone || ''); // Assuming phone might be part of admin data
-  }, [navigate]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [isPreferencesLoading, setIsPreferencesLoading] = useState(false);
 
   // Personal Information
   const [name, setName] = useState('');
@@ -38,56 +34,184 @@ export default function AdminProfilePage() {
   const [phone, setPhone] = useState('');
 
   // Password Change
-  const [currentPassword, setCurrentPassword] = useState('');
+  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Notification Preferences (mock for admin)
+  // Notification Preferences
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(true);
 
-  const [notificationCount] = useState(3); // Mock count
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/admin/login');
+      return;
+    }
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updatedAdmin = { ...adminData, name, email, phone };
-    localStorage.setItem('admin', JSON.stringify(updatedAdmin));
-    setAdminData(updatedAdmin); // Update local adminData state
-    alert('Profile updated successfully!');
+    // Initialize form with user data
+    setName(user.name || '');
+    setEmail(user.email || '');
+    setPhone(user.phone || '');
+
+    // Load notification preferences
+    loadPreferences();
+  }, [user, navigate]);
+
+  const loadPreferences = async () => {
+    try {
+      const prefs = await profileService.getNotificationPreferences();
+      setEmailNotifications(prefs.email_notifications);
+      setSmsNotifications(prefs.sms_notifications);
+    } catch (error) {
+      console.error('Failed to load preferences:', error);
+    }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a valid email address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!phone.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Phone number is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const updatedUser = await profileService.updateProfile({
+        name,
+        email,
+        phone,
+      });
+
+      setUser(updatedUser);
+
+      toast({
+        title: 'Success',
+        description: 'Profile updated successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update profile',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      alert('New passwords do not match');
+    if (!oldPassword) {
+      toast({
+        title: 'Validation Error',
+        description: 'Current password is required',
+        variant: 'destructive',
+      });
       return;
     }
 
     if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters');
+      toast({
+        title: 'Validation Error',
+        description: 'New password must be at least 6 characters',
+        variant: 'destructive',
+      });
       return;
     }
 
-    // TODO: Implement actual password change logic
-    alert('Password changed successfully!');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: 'Validation Error',
+        description: 'New passwords do not match',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsPasswordLoading(true);
+    try {
+      await profileService.changePassword({
+        old_password: oldPassword,
+        new_password: newPassword,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Password changed successfully',
+      });
+
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to change password',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPasswordLoading(false);
+    }
+  };
+
+  const handleUpdatePreferences = async () => {
+    setIsPreferencesLoading(true);
+    try {
+      await profileService.updateNotificationPreferences({
+        email_notifications: emailNotifications,
+        sms_notifications: smsNotifications,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Notification preferences updated',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update preferences',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPreferencesLoading(false);
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('admin');
+    logout();
     navigate('/admin/login');
   };
 
-  if (!adminData) return null;
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminHeader adminData={adminData} notificationCount={notificationCount} /> {/* Use reusable header */}
+      <AdminHeader adminData={user} notificationCount={0} />
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <Button
           variant="ghost"
@@ -108,6 +232,46 @@ export default function AdminProfilePage() {
         </div>
 
         <div className="space-y-6">
+          {/* Station Information (Read-only) */}
+          {user.station && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+                  <Building className="h-5 w-5" />
+                  Station Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Station Name</Label>
+                    <p className="text-lg font-medium text-foreground mt-1">
+                      {user.station.name}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Station Code</Label>
+                    <p className="text-lg font-medium text-foreground mt-1">
+                      {user.station.code}
+                    </p>
+                  </div>
+                  {user.station.address && (
+                    <div className="sm:col-span-2">
+                      <Label className="text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        Address
+                      </Label>
+                      <p className="text-foreground mt-1">{user.station.address}</p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-4">
+                  Contact your Super Admin to update station information
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Personal Information */}
           <Card>
             <CardHeader>
@@ -150,9 +314,18 @@ export default function AdminProfilePage() {
                     className="h-11"
                   />
                 </div>
-                <Button type="submit" className="w-full sm:w-auto">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
+                <Button type="submit" className="w-full sm:w-auto" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </form>
             </CardContent>
@@ -168,71 +341,57 @@ export default function AdminProfilePage() {
             <CardContent>
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Label htmlFor="current-password">Current Password</Label>
                   <Input
-                    id="currentPassword"
+                    id="current-password"
                     type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    required
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
                     className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
+                  <Label htmlFor="new-password">New Password</Label>
                   <Input
-                    id="newPassword"
+                    id="new-password"
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    required
                     className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
                   <Input
-                    id="confirmPassword"
+                    id="confirm-password"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
                     className="h-11"
                   />
                 </div>
-                <Button type="submit" className="w-full sm:w-auto">
-                  <Save className="h-4 w-4 mr-2" />
-                  Update Password
+                <Button
+                  type="submit"
+                  className="w-full sm:w-auto"
+                  disabled={isPasswordLoading}
+                >
+                  {isPasswordLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert className="h-4 w-4 mr-2" />
+                      Update Password
+                    </>
+                  )}
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          {/* Station Information (Read-Only) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Assigned Station Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Station Name</Label>
-                <Input value={adminData.stationName} readOnly className="h-11 bg-muted" />
-              </div>
-              <div className="space-y-2">
-                <Label>Station ID</Label>
-                <Input value={adminData.stationId} readOnly className="h-11 bg-muted" />
-              </div>
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <Input value={adminData.role.replace('_', ' ')} readOnly className="h-11 bg-muted" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Notification Preferences (Admin specific) */}
+          {/* Notification Preferences */}
           <Card>
             <CardHeader>
               <CardTitle className="text-xl font-bold text-foreground">
@@ -242,50 +401,59 @@ export default function AdminProfilePage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="admin-email-notifications" className="text-base">
-                    Email Notifications
-                  </Label>
+                  <Label htmlFor="email-notif">Email Notifications</Label>
                   <p className="text-sm text-muted-foreground">
-                    Receive critical alerts and updates via email
+                    Receive station updates via email
                   </p>
                 </div>
                 <Switch
-                  id="admin-email-notifications"
+                  id="email-notif"
                   checked={emailNotifications}
                   onCheckedChange={setEmailNotifications}
                 />
               </div>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="admin-sms-notifications" className="text-base">
-                    SMS Notifications
-                  </Label>
+                  <Label htmlFor="sms-notif">SMS Notifications</Label>
                   <p className="text-sm text-muted-foreground">
-                    Receive urgent notifications via SMS
+                    Receive urgent alerts via SMS
                   </p>
                 </div>
                 <Switch
-                  id="admin-sms-notifications"
+                  id="sms-notif"
                   checked={smsNotifications}
                   onCheckedChange={setSmsNotifications}
                 />
               </div>
+              <Button
+                onClick={handleUpdatePreferences}
+                className="w-full sm:w-auto"
+                disabled={isPreferencesLoading}
+              >
+                {isPreferencesLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Preferences
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
 
           {/* Logout */}
-          <Card className="border-destructive">
+          <Card>
             <CardHeader>
               <CardTitle className="text-xl font-bold text-foreground">
                 Account Actions
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Button
-                variant="destructive"
-                onClick={handleLogout}
-                className="w-full sm:w-auto"
-              >
+              <Button onClick={handleLogout} variant="destructive" className="w-full sm:w-auto">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>

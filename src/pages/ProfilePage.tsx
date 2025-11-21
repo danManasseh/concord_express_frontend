@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
 import {
   Package,
   Bell,
@@ -12,27 +13,28 @@ import {
   ArrowLeft,
   Save,
   LogOut,
+  Loader2,
+  ShieldAlert,
 } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
+import profileService from '@/services/profileService';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, setUser, logout } = useAuthStore();
 
-  // Check if user is logged in
-  const userStr = localStorage.getItem('user');
-  if (!userStr) {
-    navigate('/login');
-    return null;
-  }
-
-  const userData = JSON.parse(userStr);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [isPreferencesLoading, setIsPreferencesLoading] = useState(false);
 
   // Personal Information
-  const [name, setName] = useState(userData.name || '');
-  const [email, setEmail] = useState(userData.email || '');
-  const [phone, setPhone] = useState(userData.phone || '');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Password Change
-  const [currentPassword, setCurrentPassword] = useState('');
+  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -40,39 +42,173 @@ export default function ProfilePage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(true);
 
-  const [notificationCount] = useState(3);
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updatedUser = { ...userData, name, email, phone };
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    alert('Profile updated successfully!');
+    // Initialize form with user data
+    setName(user.name || '');
+    setEmail(user.email || '');
+    setPhone(user.phone || '');
+
+    // Load notification preferences
+    loadPreferences();
+  }, [user, navigate]);
+
+  const loadPreferences = async () => {
+    try {
+      const prefs = await profileService.getNotificationPreferences();
+      setEmailNotifications(prefs.email_notifications);
+      setSmsNotifications(prefs.sms_notifications);
+    } catch (error) {
+      // Silently fail - use defaults
+      console.error('Failed to load preferences:', error);
+    }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a valid email address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!phone.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Phone number is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const updatedUser = await profileService.updateProfile({
+        name,
+        email,
+        phone,
+      });
+
+      setUser(updatedUser);
+
+      toast({
+        title: 'Success',
+        description: 'Profile updated successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update profile',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      alert('New passwords do not match');
+    if (!oldPassword) {
+      toast({
+        title: 'Validation Error',
+        description: 'Current password is required',
+        variant: 'destructive',
+      });
       return;
     }
 
     if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters');
+      toast({
+        title: 'Validation Error',
+        description: 'New password must be at least 6 characters',
+        variant: 'destructive',
+      });
       return;
     }
 
-    // TODO: Implement actual password change logic
-    alert('Password changed successfully!');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: 'Validation Error',
+        description: 'New passwords do not match',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsPasswordLoading(true);
+    try {
+      await profileService.changePassword({
+        old_password: oldPassword,
+        new_password: newPassword,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Password changed successfully',
+      });
+
+      // Clear password fields
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to change password',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPasswordLoading(false);
+    }
+  };
+
+  const handleUpdatePreferences = async () => {
+    setIsPreferencesLoading(true);
+    try {
+      await profileService.updateNotificationPreferences({
+        email_notifications: emailNotifications,
+        sms_notifications: smsNotifications,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Notification preferences updated',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update preferences',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPreferencesLoading(false);
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
+    logout();
     navigate('/login');
   };
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -82,17 +218,14 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
               <Package className="h-6 w-6 text-primary" />
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Concord Express</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                Concord Express
+              </h1>
             </Link>
             <div className="flex items-center gap-3">
               <Link to="/notifications">
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5" />
-                  {notificationCount > 0 && (
-                    <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                      {notificationCount}
-                    </span>
-                  )}
                 </Button>
               </Link>
               <Link to="/profile">
@@ -169,9 +302,18 @@ export default function ProfilePage() {
                       className="h-11"
                     />
                   </div>
-                  <Button type="submit" className="w-full sm:w-auto">
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
+                  <Button type="submit" className="w-full sm:w-auto" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>
@@ -187,41 +329,51 @@ export default function ProfilePage() {
               <CardContent>
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current Password</Label>
+                    <Label htmlFor="current-password">Current Password</Label>
                     <Input
-                      id="currentPassword"
+                      id="current-password"
                       type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      required
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
                       className="h-11"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
+                    <Label htmlFor="new-password">New Password</Label>
                     <Input
-                      id="newPassword"
+                      id="new-password"
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      required
                       className="h-11"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
                     <Input
-                      id="confirmPassword"
+                      id="confirm-password"
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
                       className="h-11"
                     />
                   </div>
-                  <Button type="submit" className="w-full sm:w-auto">
-                    <Save className="h-4 w-4 mr-2" />
-                    Update Password
+                  <Button
+                    type="submit"
+                    className="w-full sm:w-auto"
+                    disabled={isPasswordLoading}
+                  >
+                    {isPasswordLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert className="h-4 w-4 mr-2" />
+                        Update Password
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>
@@ -237,50 +389,59 @@ export default function ProfilePage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="email-notifications" className="text-base">
-                      Email Notifications
-                    </Label>
+                    <Label htmlFor="email-notif">Email Notifications</Label>
                     <p className="text-sm text-muted-foreground">
-                      Receive updates about your deliveries via email
+                      Receive updates via email
                     </p>
                   </div>
                   <Switch
-                    id="email-notifications"
+                    id="email-notif"
                     checked={emailNotifications}
                     onCheckedChange={setEmailNotifications}
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="sms-notifications" className="text-base">
-                      SMS Notifications
-                    </Label>
+                    <Label htmlFor="sms-notif">SMS Notifications</Label>
                     <p className="text-sm text-muted-foreground">
-                      Receive updates about your deliveries via SMS
+                      Receive updates via SMS
                     </p>
                   </div>
                   <Switch
-                    id="sms-notifications"
+                    id="sms-notif"
                     checked={smsNotifications}
                     onCheckedChange={setSmsNotifications}
                   />
                 </div>
+                <Button
+                  onClick={handleUpdatePreferences}
+                  className="w-full sm:w-auto"
+                  disabled={isPreferencesLoading}
+                >
+                  {isPreferencesLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Preferences
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
 
             {/* Logout */}
-            <Card className="border-destructive">
+            <Card>
               <CardHeader>
                 <CardTitle className="text-xl font-bold text-foreground">
                   Account Actions
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Button
-                  variant="destructive"
-                  onClick={handleLogout}
-                  className="w-full sm:w-auto"
-                >
+                <Button onClick={handleLogout} variant="destructive" className="w-full sm:w-auto">
                   <LogOut className="h-4 w-4 mr-2" />
                   Logout
                 </Button>

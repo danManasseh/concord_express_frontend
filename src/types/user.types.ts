@@ -3,7 +3,7 @@ export type UserRole = 'user' | 'admin' | 'superadmin';
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   role: UserRole;
   station?: Station;
@@ -21,7 +21,7 @@ export interface Station {
 }
 
 export interface LoginRequest {
-  email: string;
+  phone: string;  // Changed from email to phone
   password: string;
 }
 
@@ -33,7 +33,7 @@ export interface LoginResponse {
 
 export interface SignupRequest {
   name: string;
-  email: string;
+  email?: string;  // Email is optional
   phone: string;
   password: string;
 }

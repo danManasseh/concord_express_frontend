@@ -3,7 +3,7 @@ import api, { handleApiError } from './api';
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   role: 'user' | 'admin' | 'superadmin';
   station: string | null;

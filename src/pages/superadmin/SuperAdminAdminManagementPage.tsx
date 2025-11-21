@@ -81,7 +81,7 @@ export default function SuperAdminAdminManagementPage() {
     setSelectedAdmin(admin);
     setFormData({
       name: admin.name,
-      email: admin.email,
+      email: admin.email ?? '',
       phone: admin.phone,
       password: '', // Don't populate password
       station: admin.station?.id || '',
@@ -189,7 +189,7 @@ export default function SuperAdminAdminManagementPage() {
   const filteredAdmins = admins.filter((admin) => {
     const matchesSearch =
       admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      // admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       admin.phone.includes(searchTerm);
 
     const matchesStation =

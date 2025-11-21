@@ -53,26 +53,26 @@ export default function SuperAdminUserOverviewPage() {
   }, [navigate]);
 
   useEffect(() => {
-    if (superAdminData) {
-      fetchUsers();
-    }
-  }, [superAdminData]);
+    if (!superAdminData) return;
 
-  const fetchUsers = async () => {
-    setIsLoading(true);
-    try {
-      const response = await userService.getAllUsers();
-      setUsers(response.results);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to fetch users',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const fetchUsers = async () => {
+      setIsLoading(true);
+      try {
+        const response = await userService.getAllUsers();
+        setUsers(response.results);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to fetch users',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [superAdminData, toast]);
 
   const getStatusColor = (isActive: boolean) => {
     return isActive
@@ -81,9 +81,10 @@ export default function SuperAdminUserOverviewPage() {
   };
 
   const filteredUsers = users.filter((user) => {
+    const emailMatch = user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emailMatch ||
       user.phone.includes(searchQuery);
     
     const matchesStatus =

@@ -43,13 +43,14 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.1",
+    "recharts": "^3.4.1",
     "tailwind-merge": "^1.14.0",
     "zustand": "4.5.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "@types/react": "18.2.0",
-    "@types/react-dom": "18.2.0",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "4.3.4",
     "esbuild": "0.25.5",
     "globals": "15.12.0",

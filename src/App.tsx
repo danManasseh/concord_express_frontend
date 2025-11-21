@@ -15,7 +15,6 @@ import AdminCreateParcelPage from './pages/admin/AdminCreateParcelPage';
 import AdminParcelDetailsPage from './pages/admin/AdminParcelDetailsPage';
 import AdminBusArrivalPage from './pages/admin/AdminBusArrivalPage';
 import AdminPaymentRecordsPage from './pages/admin/AdminPaymentRecordsPage';
-import AdminNotificationsPage from './pages/admin/AdminNotificationsPage';
 import AdminProfilePage from './pages/admin/AdminProfilePage';
 import SuperAdminLoginPage from './pages/superadmin/SuperAdminLoginPage';
 import SuperAdminDashboardPage from './pages/superadmin/SuperAdminDashboardPage';
@@ -23,9 +22,8 @@ import SuperAdminStationManagementPage from './pages/superadmin/SuperAdminStatio
 import SuperAdminAdminManagementPage from './pages/superadmin/SuperAdminAdminManagementPage';
 import SuperAdminGlobalParcelOverviewPage from './pages/superadmin/SuperAdminGlobalParcelOverviewPage';
 import SuperAdminGlobalPaymentRecordsPage from './pages/superadmin/SuperAdminGlobalPaymentRecordsPage';
-import SuperAdminNotificationsPage from './pages/superadmin/SuperAdminNotificationsPage';
 import SuperAdminProfilePage from './pages/superadmin/SuperAdminProfilePage';
-import SuperAdminAnalyticsReportsPage from './pages/superadmin/SuperAdminAnalyticsReportsPage';
+import SuperAdminAnalyticsReportsPage from './pages/superadmin/SuperAdminAnalyticsDashboardPage';
 import SuperAdminUserOverviewPage from './pages/superadmin/SuperAdminUserOverviewPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
@@ -125,21 +123,19 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/admin/notifications"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin/payments"
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminPaymentRecordsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/notifications"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminNotificationsPage />
             </ProtectedRoute>
           }
         />
@@ -182,7 +178,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/superadmin/notifications"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/superadmin/parcels"
           element={
@@ -197,15 +200,6 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
               <SuperAdminGlobalPaymentRecordsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/superadmin/notifications"
-          element={
-            <ProtectedRoute allowedRoles={['superadmin']}>
-              <SuperAdminNotificationsPage />
             </ProtectedRoute>
           }
         />
