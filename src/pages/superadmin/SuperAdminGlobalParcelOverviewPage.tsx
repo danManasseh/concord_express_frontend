@@ -1,427 +1,455 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  ArrowLeft,
-  Package,
-  Search,
-  Eye,
-  MapPin,
-  DollarSign,
-} from 'lucide-react';
-import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
+import { Eye, Filter, Download, Package, TrendingUp, Clock, CheckCircle } from 'lucide-react';
+import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
+import parcelService from '@/services/parcel.service';
+import stationService from '@/services/station.service';
+import { Parcel } from '@/types/parcel.types';
+import { Station } from '@/types/user.types';
 import { useIsMobile } from '@/hooks/use-mobile';
-
-// Mock data for all parcels (global view)
-const mockAllParcels = [
-  {
-    trackingId: 'TRK001001',
-    sender: { name: 'Alice Smith' },
-    recipient: { name: 'Bob Johnson' },
-    originStation: 'Station A - Downtown',
-    destinationStation: 'Station B - Uptown',
-    status: 'Payment Pending',
-    paymentStatus: 'Pending',
-    paymentOption: 'receiver_pays',
-    package: { amount: 15.00, description: 'Small electronics' },
-    truckIdentifier: null,
-    createdAt: '2024-01-20T10:00:00Z',
-  },
-  {
-    trackingId: 'TRK001002',
-    sender: { name: 'Charlie Brown' },
-    recipient: { name: 'Diana Prince' },
-    originStation: 'Station A - Downtown',
-    destinationStation: 'Station C - East Side',
-    status: 'In Transit',
-    paymentStatus: 'Paid',
-    paymentOption: 'sender_cash',
-    package: { amount: 25.50, description: 'Documents' },
-    truckIdentifier: 'TRK-BATCH-001',
-    createdAt: '2024-01-20T11:00:00Z',
-  },
-  {
-    trackingId: 'TRK001003',
-    sender: { name: 'Eve Adams' },
-    recipient: { name: 'Frank White' },
-    originStation: 'Station B - Uptown',
-    destinationStation: 'Station A - Downtown',
-    status: 'Arrived',
-    paymentStatus: 'Paid',
-    paymentOption: 'sender_mobile',
-    package: { amount: 30.00, description: 'Clothing' },
-    truckIdentifier: 'TRK-BATCH-002',
-    createdAt: '2024-01-19T14:30:00Z',
-  },
-  {
-    trackingId: 'TRK001004',
-    sender: { name: 'Grace Kelly' },
-    recipient: { name: 'Henry Ford' },
-    originStation: 'Station C - East Side',
-    destinationStation: 'Station A - Downtown',
-    status: 'Delivered',
-    paymentStatus: 'Paid',
-    paymentOption: 'receiver_pays',
-    package: { amount: 10.00, description: 'Books' },
-    truckIdentifier: 'TRK-BATCH-003',
-    createdAt: '2024-01-18T09:00:00Z',
-  },
-  {
-    trackingId: 'TRK001005',
-    sender: { name: 'Ivy Green' },
-    recipient: { name: 'Jack Black' },
-    originStation: 'Station A - Downtown',
-    destinationStation: 'Station D - West Side',
-    status: 'Pending Pickup',
-    paymentStatus: 'Paid',
-    paymentOption: 'sender_cash',
-    package: { amount: 20.00, description: 'Artwork' },
-    truckIdentifier: null,
-    createdAt: '2024-01-20T15:00:00Z',
-  },
-  {
-    trackingId: 'TRK001006',
-    sender: { name: 'Karen Blue' },
-    recipient: { name: 'Liam Red' },
-    originStation: 'Station D - West Side',
-    destinationStation: 'Station A - Downtown',
-    status: 'Payment Pending',
-    paymentStatus: 'Pending',
-    paymentOption: 'sender_mobile',
-    package: { amount: 40.00, description: 'Sporting goods' },
-    truckIdentifier: 'TRK-BATCH-004',
-    createdAt: '2024-01-19T11:00:00Z',
-  },
-];
-
-const allStations = [
-  { id: 'station-a', name: 'Station A - Downtown' },
-  { id: 'station-b', name: 'Station B - Uptown' },
-  { id: 'station-c', name: 'Station C - East Side' },
-  { id: 'station-d', name: 'Station D - West Side' },
-  { id: 'station-e', name: 'Station E - North End' },
-  { id: 'station-f', name: 'Station F - South District' },
-];
+import { useNavigate } from 'react-router-dom';
 
 export default function SuperAdminGlobalParcelOverviewPage() {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const [superAdminData, setSuperAdminData] = useState<any>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [originFilter, setOriginFilter] = useState('all');
-  const [destinationFilter, setDestinationFilter] = useState('all');
-  const [parcels, setParcels] = useState(mockAllParcels); // All parcels globally
+  const navigate = useNavigate();
+
+  const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterOriginStation, setFilterOriginStation] = useState<string>('all');
+  const [filterDestStation, setFilterDestStation] = useState<string>('all');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>('all');
 
   useEffect(() => {
-    const superadmin = localStorage.getItem('superadmin');
-    if (!superadmin) {
-      navigate('/superadmin/login');
-      return;
-    }
-    setSuperAdminData(JSON.parse(superadmin));
-  }, [navigate]);
+    loadData();
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('superadmin');
-    navigate('/superadmin/login');
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [parcelsData, stationsData] = await Promise.all([
+        parcelService.getParcels(),
+        stationService.getStations(),
+      ]);
+      setParcels(Array.isArray(parcelsData) ? parcelsData : parcelsData.results || []);
+      setStations(stationsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter parcels
+  const filteredParcels = parcels.filter((parcel) => {
+    const matchesSearch =
+      parcel.tracking_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      parcel.sender_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      parcel.recipient_name.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      filterStatus === 'all' || parcel.status === filterStatus;
+
+    const matchesOrigin =
+      filterOriginStation === 'all' || parcel.origin_station === filterOriginStation;
+
+    const matchesDest =
+      filterDestStation === 'all' || parcel.destination_station === filterDestStation;
+
+    const matchesPayment =
+      filterPaymentStatus === 'all' || parcel.payment_status === filterPaymentStatus;
+
+    return matchesSearch && matchesStatus && matchesOrigin && matchesDest && matchesPayment;
+  });
+
+  // Calculate statistics
+  const stats = {
+    total: parcels.length,
+    inTransit: parcels.filter((p) => p.status === 'in_transit').length,
+    delivered: parcels.filter((p) => p.status === 'delivered').length,
+    pending: parcels.filter((p) => p.status === 'created').length,
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Payment Pending':
-        return 'bg-red-100 text-red-800 border-red-300';
-      case 'Pending Pickup':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'Picked Up':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'In Transit':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'Arrived':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'Delivered':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'Failed':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
+    const colors = {
+      created: 'bg-blue-100 text-blue-800',
+      in_transit: 'bg-yellow-100 text-yellow-800',
+      arrived: 'bg-purple-100 text-purple-800',
+      delivered: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+    };
+    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
   const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'Paid':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'Refunded':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
+    const colors = {
+      paid: 'bg-green-100 text-green-800',
+      unpaid: 'bg-red-100 text-red-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      refunded: 'bg-gray-100 text-gray-800',
+    };
+    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
-  const filteredParcels = parcels.filter((parcel) => {
-    const matchesSearch =
-      parcel.trackingId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parcel.sender.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parcel.recipient.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || parcel.status === statusFilter;
-    const matchesOrigin = originFilter === 'all' || parcel.originStation === originFilter;
-    const matchesDestination = destinationFilter === 'all' || parcel.destinationStation === destinationFilter;
-    return matchesSearch && matchesStatus && matchesOrigin && matchesDestination;
-  });
+  const handleExport = () => {
+    // Convert filtered parcels to CSV
+    const headers = ['Tracking Code', 'Sender', 'Recipient', 'Origin', 'Destination', 'Status', 'Payment Status', 'Date'];
+    const rows = filteredParcels.map((p) => [
+      p.tracking_code,
+      p.sender_name,
+      p.recipient_name,
+      p.origin_station_name,
+      p.destination_station_name,
+      p.status,
+      p.payment_status,
+      new Date(p.created_at).toLocaleDateString(),
+    ]);
 
-  if (!superAdminData) return null;
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `parcels-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  if (isLoading) {
+    return (
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading parcels...</p>
+          </div>
+        </div>
+      </SuperAdminLayout>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <SuperAdminHeader superAdminData={superAdminData} notificationCount={5} />
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/superadmin/dashboard')}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-            Global Parcel Overview
-          </h1>
-          <p className="text-muted-foreground">
-            View and manage all parcels across the entire Concord Express network
-          </p>
+    <SuperAdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Global Parcel Overview</h1>
+            <p className="text-gray-600 mt-1">Monitor all parcels across the network</p>
+          </div>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Download className="w-5 h-5" />
+            Export CSV
+          </button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-foreground">
-              All Parcels
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Filters */}
-            <div className="flex flex-col gap-3 mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by tracking ID, sender, or recipient..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+        {/* Error Alert */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex justify-between items-center">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Parcels</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="Payment Pending">Payment Pending</SelectItem>
-                    <SelectItem value="Pending Pickup">Pending Pickup</SelectItem>
-                    <SelectItem value="Picked Up">Picked Up</SelectItem>
-                    <SelectItem value="In Transit">In Transit</SelectItem>
-                    <SelectItem value="Arrived">Arrived</SelectItem>
-                    <SelectItem value="Delivered">Delivered</SelectItem>
-                    <SelectItem value="Failed">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={originFilter} onValueChange={setOriginFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by origin station" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Origins</SelectItem>
-                    {allStations.map((station) => (
-                      <SelectItem key={station.id} value={station.name}>
-                        {station.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={destinationFilter} onValueChange={setDestinationFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by destination station" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Destinations</SelectItem>
-                    {allStations.map((station) => (
-                      <SelectItem key={station.id} value={station.name}>
-                        {station.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <Package className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
             </div>
+          </div>
 
-            {/* Parcels List/Table */}
-            {filteredParcels.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  No parcels found
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Try adjusting your search or filters.
-                </p>
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">In Transit</p>
+                <p className="text-2xl sm:text-3xl font-bold text-yellow-600 mt-1">{stats.inTransit}</p>
               </div>
-            ) : isMobile ? (
-              <div className="space-y-4">
-                {filteredParcels.map((parcel) => (
-                  <div
-                    key={parcel.trackingId}
-                    className="border border-border rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Tracking ID</p>
-                        <p className="font-mono font-bold text-foreground">{parcel.trackingId}</p>
-                      </div>
-                      <Badge variant="outline" className={getStatusColor(parcel.status)}>
-                        {parcel.status}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Sender</p>
-                        <p className="text-foreground">{parcel.sender.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Recipient</p>
-                        <p className="text-foreground">{parcel.recipient.name}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Origin</p>
-                        <p className="text-foreground">{parcel.originStation}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Destination</p>
-                        <p className="text-foreground">{parcel.destinationStation}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Amount</p>
-                        <p className="text-foreground">
-                          {parcel.package?.amount !== undefined
-                            ? `$${parcel.package.amount.toFixed(2)}`
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Payment</p>
-                        <Badge variant="outline" className={`${getPaymentStatusColor(parcel.paymentStatus)} text-xs`}>
-                          {parcel.paymentStatus}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => navigate(`/admin/parcels/${parcel.trackingId}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
+              <div className="bg-yellow-100 p-3 rounded-lg">
+                <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Delivered</p>
+                <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1">{stats.delivered}</p>
+              </div>
+              <div className="bg-green-100 p-3 rounded-lg">
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pending</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-600 mt-1">{stats.pending}</p>
+              </div>
+              <div className="bg-gray-100 p-3 rounded-lg">
+                <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="space-y-3">
+            {/* Search */}
+            <input
+              type="text"
+              placeholder="Search by tracking code, sender, or recipient..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+            />
+
+            {/* Filter Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Status Filter */}
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+              >
+                <option value="all">All Status</option>
+                <option value="created">Created</option>
+                <option value="in_transit">In Transit</option>
+                <option value="arrived">Arrived</option>
+                <option value="delivered">Delivered</option>
+                <option value="failed">Failed</option>
+              </select>
+
+              {/* Origin Station Filter */}
+              <select
+                value={filterOriginStation}
+                onChange={(e) => setFilterOriginStation(e.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+              >
+                <option value="all">All Origins</option>
+                {stations.map((station) => (
+                  <option key={station.id} value={station.id}>
+                    {station.name}
+                  </option>
                 ))}
+              </select>
+
+              {/* Destination Station Filter */}
+              <select
+                value={filterDestStation}
+                onChange={(e) => setFilterDestStation(e.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+              >
+                <option value="all">All Destinations</option>
+                {stations.map((station) => (
+                  <option key={station.id} value={station.id}>
+                    {station.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Payment Status Filter */}
+              <select
+                value={filterPaymentStatus}
+                onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+              >
+                <option value="all">All Payments</option>
+                <option value="paid">Paid</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="pending">Pending</option>
+                <option value="refunded">Refunded</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Results Count */}
+        <div className="text-sm text-gray-600">
+          Showing <span className="font-semibold">{filteredParcels.length}</span> of{' '}
+          <span className="font-semibold">{parcels.length}</span> parcels
+        </div>
+
+        {/* Parcels List - Mobile: Cards, Desktop: Table */}
+        {isMobile ? (
+          /* Mobile Card View */
+          <div className="space-y-3">
+            {filteredParcels.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+                No parcels found
               </div>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Tracking ID</TableHead>
-                      <TableHead className="font-semibold">Sender</TableHead>
-                      <TableHead className="font-semibold">Recipient</TableHead>
-                      <TableHead className="font-semibold">Origin</TableHead>
-                      <TableHead className="font-semibold">Destination</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
-                      <TableHead className="font-semibold">Amount</TableHead>
-                      <TableHead className="font-semibold">Payment</TableHead>
-                      <TableHead className="font-semibold text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredParcels.map((parcel) => (
-                      <TableRow key={parcel.trackingId} className="hover:bg-muted/30">
-                        <TableCell className="font-medium">{parcel.trackingId}</TableCell>
-                        <TableCell>{parcel.sender.name}</TableCell>
-                        <TableCell>{parcel.recipient.name}</TableCell>
-                        <TableCell>{parcel.originStation}</TableCell>
-                        <TableCell>{parcel.destinationStation}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={getStatusColor(parcel.status)}
-                          >
-                            {parcel.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {parcel.package?.amount !== undefined
-                            ? `$${parcel.package.amount.toFixed(2)}`
-                            : 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={getPaymentStatusColor(parcel.paymentStatus)}
-                          >
-                            {parcel.paymentStatus}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => navigate(`/admin/parcels/${parcel.trackingId}`)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              filteredParcels.map((parcel) => (
+                <div
+                  key={parcel.id}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-xs text-gray-500">Tracking Code</p>
+                      <p className="font-mono font-bold text-gray-900">{parcel.tracking_code}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(parcel.status)}`}>
+                        {parcel.status}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(parcel.payment_status)}`}>
+                        {parcel.payment_status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-3">
+                    <div>
+                      <p className="text-xs text-gray-500">Route</p>
+                      <p className="text-sm text-gray-900">
+                        {parcel.origin_station_name} → {parcel.destination_station_name}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-gray-500">Sender</p>
+                        <p className="text-sm text-gray-900 truncate">{parcel.sender_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Recipient</p>
+                        <p className="text-sm text-gray-900 truncate">{parcel.recipient_name}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Created</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(parcel.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => navigate(`/admin/parcels/${parcel.tracking_code}`)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    View Details
+                  </button>
+                </div>
+              ))
             )}
-          </CardContent>
-        </Card>
+          </div>
+        ) : (
+          /* Desktop Table View */
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tracking Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Route
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Sender
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Recipient
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Payment
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredParcels.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                        No parcels found
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredParcels.map((parcel) => (
+                      <tr key={parcel.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="font-mono text-sm font-medium text-gray-900">
+                            {parcel.tracking_code}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {parcel.origin_station_code} → {parcel.destination_station_code}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {parcel.origin_station_name} → {parcel.destination_station_name}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{parcel.sender_name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{parcel.recipient_name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(parcel.status)}`}>
+                            {parcel.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(parcel.payment_status)}`}>
+                            {parcel.payment_status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(parcel.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => navigate(`/admin/parcels/${parcel.tracking_code}`)}
+                            className="text-blue-600 hover:text-blue-900 p-1"
+                            title="View details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </SuperAdminLayout>
   );
 }

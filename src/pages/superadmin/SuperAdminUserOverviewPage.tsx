@@ -19,33 +19,29 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft,
   Users,
   Search,
-  Eye,
   CheckCircle,
   XCircle,
+  Loader2,
 } from 'lucide-react';
 import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
 import { useIsMobile } from '@/hooks/use-mobile';
-
-// Mock data for users (customers)
-const mockUsers = [
-  { id: 'user-1', name: 'John Doe', email: 'john@example.com', phone: '111-222-3333', status: 'Active', registeredAt: '2023-01-10T08:00:00Z' },
-  { id: 'user-2', name: 'Jane Smith', email: 'jane@example.com', phone: '444-555-6666', status: 'Active', registeredAt: '2023-02-15T09:30:00Z' },
-  { id: 'user-3', name: 'Bob Johnson', email: 'bob@example.com', phone: '777-888-9999', status: 'Inactive', registeredAt: '2023-03-01T14:00:00Z' },
-  { id: 'user-4', name: 'Alice Brown', email: 'alice@example.com', phone: '123-456-7890', status: 'Active', registeredAt: '2023-04-20T10:15:00Z' },
-  { id: 'user-5', name: 'Charlie Green', email: 'charlie@example.com', phone: '987-654-3210', status: 'Active', registeredAt: '2023-05-05T11:45:00Z' },
-];
+import userService, { User } from '@/services/userService';
 
 export default function SuperAdminUserOverviewPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   const [superAdminData, setSuperAdminData] = useState<any>(null);
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const superadmin = localStorage.getItem('superadmin');
@@ -56,8 +52,30 @@ export default function SuperAdminUserOverviewPage() {
     setSuperAdminData(JSON.parse(superadmin));
   }, [navigate]);
 
-  const getStatusColor = (status: string) => {
-    return status === 'Active'
+  useEffect(() => {
+    if (superAdminData) {
+      fetchUsers();
+    }
+  }, [superAdminData]);
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await userService.getAllUsers();
+      setUsers(response.results);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch users',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getStatusColor = (isActive: boolean) => {
+    return isActive
       ? 'bg-green-100 text-green-800 border-green-300'
       : 'bg-red-100 text-red-800 border-red-300';
   };
@@ -67,15 +85,46 @@ export default function SuperAdminUserOverviewPage() {
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.phone.includes(searchQuery);
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+    
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && user.is_active) ||
+      (statusFilter === 'inactive' && !user.is_active);
+    
     return matchesSearch && matchesStatus;
   });
 
-  const handleToggleStatus = (id: string, name: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    if (window.confirm(`Are you sure you want to mark user "${name}" as "${newStatus}"?`)) {
-      setUsers(users.map((u) => (u.id === id ? { ...u, status: newStatus } : u)));
-      alert(`User "${name}" status changed to "${newStatus}".`);
+  const handleToggleStatus = async (id: string, name: string, currentStatus: boolean) => {
+    const action = currentStatus ? 'deactivate' : 'activate';
+    const newStatus = !currentStatus;
+
+    if (!window.confirm(`Are you sure you want to ${action} user "${name}"?`)) {
+      return;
+    }
+
+    setIsActionLoading(id);
+    try {
+      if (currentStatus) {
+        await userService.deactivateUser(id);
+      } else {
+        await userService.activateUser(id);
+      }
+
+      // Update local state
+      setUsers(users.map((u) => (u.id === id ? { ...u, is_active: newStatus } : u)));
+
+      toast({
+        title: 'Success',
+        description: `User "${name}" has been ${action}d successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : `Failed to ${action} user`,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsActionLoading(null);
     }
   };
 
@@ -83,7 +132,7 @@ export default function SuperAdminUserOverviewPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SuperAdminHeader superAdminData={superAdminData} notificationCount={5} />
+      <SuperAdminHeader adminData={superAdminData} notificationCount={5} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -123,27 +172,34 @@ export default function SuperAdminUserOverviewPage() {
                   className="pl-10"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Users List/Table */}
-            {filteredUsers.length === 0 ? (
+            {/* Loading State */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-3 text-muted-foreground">Loading users...</span>
+              </div>
+            ) : filteredUsers.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">
                   No users found
                 </h3>
                 <p className="text-muted-foreground mb-6">
-                  Try adjusting your search or filters.
+                  {users.length === 0
+                    ? 'No users have registered yet.'
+                    : 'Try adjusting your search or filters.'}
                 </p>
               </div>
             ) : isMobile ? (
@@ -158,8 +214,8 @@ export default function SuperAdminUserOverviewPage() {
                         <p className="text-xs text-muted-foreground">User ID</p>
                         <p className="font-mono font-bold text-foreground">{user.id}</p>
                       </div>
-                      <Badge variant="outline" className={getStatusColor(user.status)}>
-                        {user.status}
+                      <Badge variant="outline" className={getStatusColor(user.is_active)}>
+                        {user.is_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </div>
                     <div>
@@ -176,21 +232,26 @@ export default function SuperAdminUserOverviewPage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Registered</p>
-                      <p className="text-foreground">{new Date(user.registeredAt).toLocaleDateString()}</p>
+                      <p className="text-foreground">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </p>
                     </div>
                     <div className="flex gap-2 pt-2">
                       <Button
-                        variant={user.status === 'Active' ? 'destructive' : 'default'}
+                        variant={user.is_active ? 'destructive' : 'default'}
                         size="sm"
                         className="flex-1"
-                        onClick={() => handleToggleStatus(user.id, user.name, user.status)}
+                        onClick={() => handleToggleStatus(user.id, user.name, user.is_active)}
+                        disabled={isActionLoading === user.id}
                       >
-                        {user.status === 'Active' ? (
+                        {isActionLoading === user.id ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : user.is_active ? (
                           <XCircle className="h-4 w-4 mr-1" />
                         ) : (
                           <CheckCircle className="h-4 w-4 mr-1" />
                         )}
-                        {user.status === 'Active' ? 'Deactivate' : 'Activate'}
+                        {user.is_active ? 'Deactivate' : 'Activate'}
                       </Button>
                     </div>
                   </div>
@@ -218,24 +279,29 @@ export default function SuperAdminUserOverviewPage() {
                         <TableCell>{user.email}</TableCell>
                         <TableCell>{user.phone}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getStatusColor(user.status)}>
-                            {user.status}
+                          <Badge variant="outline" className={getStatusColor(user.is_active)}>
+                            {user.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
-                        <TableCell>{new Date(user.registeredAt).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button
-                            variant={user.status === 'Active' ? 'destructive' : 'default'}
+                            variant={user.is_active ? 'destructive' : 'default'}
                             size="sm"
                             className="h-8 text-xs"
-                            onClick={() => handleToggleStatus(user.id, user.name, user.status)}
+                            onClick={() => handleToggleStatus(user.id, user.name, user.is_active)}
+                            disabled={isActionLoading === user.id}
                           >
-                            {user.status === 'Active' ? (
+                            {isActionLoading === user.id ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : user.is_active ? (
                               <XCircle className="h-4 w-4 mr-1" />
                             ) : (
                               <CheckCircle className="h-4 w-4 mr-1" />
                             )}
-                            {user.status === 'Active' ? 'Deactivate' : 'Activate'}
+                            {user.is_active ? 'Deactivate' : 'Activate'}
                           </Button>
                         </TableCell>
                       </TableRow>

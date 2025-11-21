@@ -1,408 +1,605 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  ArrowLeft,
-  MapPin,
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  CheckCircle,
-  XCircle,
-	Save,
-} from 'lucide-react';
-import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
+import { Plus, Edit2, Trash2, MapPin, Phone, CheckCircle, XCircle } from 'lucide-react';
+import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
+import stationService from '@/services/station.service';
+import { Station } from '@/types/user.types';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Badge } from '@/components/ui/badge';
-import {
-	Select,
-  SelectGroup,
-  SelectValue,
-  SelectTrigger,
-  SelectContent,
-  SelectLabel,
-  SelectItem,
-  SelectSeparator,
-  SelectScrollUpButton,
-  SelectScrollDownButton,
-} from '@/components/ui/select';
 
-// Mock data for stations
-const mockStations = [
-  { id: 'station-a', name: 'Station A - Downtown', location: '123 Main St, City A', status: 'Active' },
-  { id: 'station-b', name: 'Station B - Uptown', location: '456 Oak Ave, City B', status: 'Active' },
-  { id: 'station-c', name: 'Station C - East Side', location: '789 Pine Ln, City C', status: 'Active' },
-  { id: 'station-d', name: 'Station D - West Side', location: '101 Elm Rd, City D', status: 'Active' },
-  { id: 'station-e', name: 'Station E - North End', location: '202 Birch Blvd, City E', status: 'Active' },
-  { id: 'station-f', name: 'Station F - South District', location: '303 Cedar Ct, City F', status: 'Inactive' },
-];
+interface StationFormData {
+  code: string;
+  name: string;
+  address: string;
+  contact_phone: string;
+}
 
 export default function SuperAdminStationManagementPage() {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const [superAdminData, setSuperAdminData] = useState<any>(null);
-  const [stations, setStations] = useState(mockStations);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentStation, setCurrentStation] = useState<any | null>(null); // For edit/add
-  const [stationName, setStationName] = useState('');
-  const [stationLocation, setStationLocation] = useState('');
-  const [stationStatus, setStationStatus] = useState('Active');
+  const [stations, setStations] = useState<Station[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  
+  // Form state
+  const [formData, setFormData] = useState<StationFormData>({
+    code: '',
+    name: '',
+    address: '',
+    contact_phone: '',
+  });
+  const [formErrors, setFormErrors] = useState<Partial<StationFormData>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Search and filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
   useEffect(() => {
-    const superadmin = localStorage.getItem('superadmin');
-    if (!superadmin) {
-      navigate('/superadmin/login');
+    loadStations();
+  }, []);
+
+  const loadStations = async () => {
+    try {
+      setIsLoading(true);
+      const data = await stationService.getStations();
+      setStations(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load stations');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openCreateModal = () => {
+    setModalMode('create');
+    setSelectedStation(null);
+    setFormData({
+      code: '',
+      name: '',
+      address: '',
+      contact_phone: '',
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (station: Station) => {
+    setModalMode('edit');
+    setSelectedStation(station);
+    setFormData({
+      code: station.code,
+      name: station.name,
+      address: station.address,
+      contact_phone: station.contact_phone || '',
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedStation(null);
+    setFormData({
+      code: '',
+      name: '',
+      address: '',
+      contact_phone: '',
+    });
+    setFormErrors({});
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Partial<StationFormData> = {};
+
+    if (!formData.code.trim()) {
+      errors.code = 'Station code is required';
+    } else if (!/^[A-Z]{2,5}$/.test(formData.code.trim())) {
+      errors.code = 'Code must be 2-5 uppercase letters (e.g., ACC, KSI)';
+    }
+
+    if (!formData.name.trim()) {
+      errors.name = 'Station name is required';
+    } else if (formData.name.trim().length < 3) {
+      errors.name = 'Name must be at least 3 characters';
+    }
+
+    if (!formData.address.trim()) {
+      errors.address = 'Address is required';
+    }
+
+    if (formData.contact_phone && !/^[0-9]{10,15}$/.test(formData.contact_phone.replace(/\s/g, ''))) {
+      errors.contact_phone = 'Invalid phone number (10-15 digits)';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) return;
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      if (modalMode === 'create') {
+        await stationService.createStation(formData);
+      } else if (selectedStation) {
+        await stationService.updateStation(selectedStation.id, formData);
+      }
+
+      await loadStations();
+      closeModal();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save station');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleActive = async (station: Station) => {
+    try {
+      if (station.is_active) {
+        await stationService.deactivateStation(station.id);
+      } else {
+        await stationService.activateStation(station.id);
+      }
+      await loadStations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update station status');
+    }
+  };
+
+  const handleDeleteStation = async (station: Station) => {
+    if (!confirm(`Are you sure you want to delete ${station.name}? This action cannot be undone.`)) {
       return;
     }
-    setSuperAdminData(JSON.parse(superadmin));
-  }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('superadmin');
-    navigate('/superadmin/login');
-  };
-
-  const filteredStations = stations.filter(
-    (station) =>
-      station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      station.location.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const openAddDialog = () => {
-    setCurrentStation(null);
-    setStationName('');
-    setStationLocation('');
-    setStationStatus('Active');
-    setIsDialogOpen(true);
-  };
-
-  const openEditDialog = (station: any) => {
-    setCurrentStation(station);
-    setStationName(station.name);
-    setStationLocation(station.location);
-    setStationStatus(station.status);
-    setIsDialogOpen(true);
-  };
-
-  const handleSaveStation = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (currentStation) {
-      // Edit existing station
-      setStations(
-        stations.map((s) =>
-          s.id === currentStation.id
-            ? { ...s, name: stationName, location: stationLocation, status: stationStatus }
-            : s
-        )
-      );
-      alert(`Station ${stationName} updated successfully!`);
-    } else {
-      // Add new station
-      const newId = `station-${(Math.random() * 1000).toFixed(0)}`;
-      setStations([
-        ...stations,
-        { id: newId, name: stationName, location: stationLocation, status: stationStatus },
-      ]);
-      alert(`Station ${stationName} added successfully!`);
-    }
-    setIsDialogOpen(false);
-  };
-
-  const handleDeleteStation = (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete station "${name}"? This action cannot be undone.`)) {
-      setStations(stations.filter((s) => s.id !== id));
-      alert(`Station "${name}" deleted.`);
+    try {
+      await stationService.deleteStation(station.id);
+      await loadStations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete station');
     }
   };
 
-  const handleToggleStatus = (id: string, name: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-    if (window.confirm(`Are you sure you want to mark station "${name}" as "${newStatus}"?`)) {
-      setStations(
-        stations.map((s) => (s.id === id ? { ...s, status: newStatus } : s))
-      );
-      alert(`Station "${name}" status changed to "${newStatus}".`);
-    }
-  };
+  // Filter stations
+  const filteredStations = stations.filter((station) => {
+    const matchesSearch =
+      station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      station.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      station.address.toLowerCase().includes(searchTerm.toLowerCase());
 
-  if (!superAdminData) return null;
+    const matchesStatus =
+      filterStatus === 'all' ||
+      (filterStatus === 'active' && station.is_active) ||
+      (filterStatus === 'inactive' && !station.is_active);
+
+    return matchesSearch && matchesStatus;
+  });
+
+  if (isLoading) {
+    return (
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading stations...</p>
+          </div>
+        </div>
+      </SuperAdminLayout>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <SuperAdminHeader superAdminData={superAdminData} notificationCount={5} />
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/superadmin/dashboard')}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+    <SuperAdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-              Station Management
-            </h1>
-            <p className="text-muted-foreground">
-              Manage all delivery stations in the Concord Express network
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900">Station Management</h1>
+            <p className="text-gray-600 mt-1">Manage all delivery stations across the network</p>
           </div>
-          <Button onClick={openAddDialog} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Add New Station
-          </Button>
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Add Station
+          </button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-foreground">
-              All Stations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Filters */}
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by station name or location..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+        {/* Error Alert */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex justify-between items-center">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-red-700 hover:text-red-900">
+              ×
+            </button>
+          </div>
+        )}
 
-            {/* Stations List/Table */}
-            {filteredStations.length === 0 ? (
-              <div className="text-center py-12">
-                <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  No stations found
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Try adjusting your search or add a new station.
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Stations</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stations.length}</p>
+              </div>
+              <div className="bg-blue-100 p-3 rounded-lg">
+                <MapPin className="w-8 h-8 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Active Stations</p>
+                <p className="text-3xl font-bold text-green-600 mt-1">
+                  {stations.filter((s) => s.is_active).length}
                 </p>
               </div>
-            ) : isMobile ? (
-              <div className="space-y-4">
-                {filteredStations.map((station) => (
-                  <div
-                    key={station.id}
-                    className="border border-border rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Station ID</p>
-                        <p className="font-mono font-bold text-foreground">{station.id}</p>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={
-                          station.status === 'Active'
-                            ? 'bg-green-100 text-green-800 border-green-300'
-                            : 'bg-red-100 text-red-800 border-red-300'
-                        }
-                      >
-                        {station.status}
-                      </Badge>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Name</p>
-                      <p className="text-foreground">{station.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Location</p>
-                      <p className="text-foreground">{station.location}</p>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => openEditDialog(station)}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant={station.status === 'Active' ? 'destructive' : 'default'}
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleToggleStatus(station.id, station.name, station.status)}
-                      >
-                        {station.status === 'Active' ? (
-                          <XCircle className="h-4 w-4 mr-1" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                        )}
-                        {station.status === 'Active' ? 'Deactivate' : 'Activate'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteStation(station.id, station.name)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-green-100 p-3 rounded-lg">
+                <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Inactive Stations</p>
+                <p className="text-3xl font-bold text-gray-600 mt-1">
+                  {stations.filter((s) => !s.is_active).length}
+                </p>
+              </div>
+              <div className="bg-gray-100 p-3 rounded-lg">
+                <XCircle className="w-8 h-8 text-gray-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="space-y-3">
+            {/* Search Bar */}
+            <input
+              type="text"
+              placeholder="Search stations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+            />
+            
+            {/* Status Filter - Mobile: Dropdown, Desktop: Buttons */}
+            {isMobile ? (
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+              >
+                <option value="all">All Stations</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Station ID</TableHead>
-                      <TableHead className="font-semibold">Name</TableHead>
-                      <TableHead className="font-semibold">Location</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
-                      <TableHead className="font-semibold text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStations.map((station) => (
-                      <TableRow key={station.id} className="hover:bg-muted/30">
-                        <TableCell className="font-medium">{station.id}</TableCell>
-                        <TableCell>{station.name}</TableCell>
-                        <TableCell>{station.location}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              station.status === 'Active'
-                                ? 'bg-green-100 text-green-800 border-green-300'
-                                : 'bg-red-100 text-red-800 border-red-300'
-                            }
-                          >
-                            {station.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openEditDialog(station)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant={station.status === 'Active' ? 'destructive' : 'default'}
-                              size="sm"
-                              className="h-8 text-xs"
-                              onClick={() => handleToggleStatus(station.id, station.name, station.status)}
-                            >
-                              {station.status === 'Active' ? (
-                                <XCircle className="h-4 w-4 mr-1" />
-                              ) : (
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                              )}
-                              {station.status === 'Active' ? 'Deactivate' : 'Activate'}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleDeleteStation(station.id, station.name)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    filterStatus === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setFilterStatus('active')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    filterStatus === 'active'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  onClick={() => setFilterStatus('inactive')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    filterStatus === 'inactive'
+                      ? 'bg-gray-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Inactive
+                </button>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        {/* Stations List - Mobile: Cards, Desktop: Table */}
+        {isMobile ? (
+          /* Mobile Card View */
+          <div className="space-y-3">
+            {filteredStations.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+                No stations found
+              </div>
+            ) : (
+              filteredStations.map((station) => (
+                <div
+                  key={station.id}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <MapPin className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{station.name}</h3>
+                        <span className="inline-block px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-800 rounded mt-1">
+                          {station.code}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleToggleActive(station)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        station.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {station.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="text-sm text-gray-600">
+                      <MapPin className="w-4 h-4 inline mr-1 text-gray-400" />
+                      {station.address}
+                    </div>
+                    {station.contact_phone && (
+                      <div className="text-sm text-gray-600">
+                        <Phone className="w-4 h-4 inline mr-1 text-gray-400" />
+                        {station.contact_phone}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => openEditModal(station)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStation(station)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          /* Desktop Table View */
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Station
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredStations.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                        No stations found
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStations.map((station) => (
+                      <tr key={station.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <MapPin className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{station.name}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 py-1 text-xs font-semibold bg-gray-100 text-gray-800 rounded">
+                            {station.code}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{station.address}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {station.contact_phone ? (
+                            <div className="flex items-center text-sm text-gray-900">
+                              <Phone className="w-4 h-4 mr-1 text-gray-400" />
+                              {station.contact_phone}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">Not provided</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleToggleActive(station)}
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              station.is_active
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            }`}
+                          >
+                            {station.is_active ? 'Active' : 'Inactive'}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openEditModal(station)}
+                              className="text-blue-600 hover:text-blue-900 p-1"
+                              title="Edit station"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStation(station)}
+                              className="text-red-600 hover:text-red-900 p-1"
+                              title="Delete station"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Add/Edit Station Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{currentStation ? 'Edit Station' : 'Add New Station'}</DialogTitle>
-            <DialogDescription>
-              {currentStation
-                ? `Make changes to ${currentStation.name} here.`
-                : 'Add a new delivery station to the network.'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSaveStation} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="stationName">Station Name</Label>
-              <Input
-                id="stationName"
-                value={stationName}
-                onChange={(e) => setStationName(e.target.value)}
-                placeholder="e.g., Station G - North East"
-                required
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stationLocation">Location</Label>
-              <Input
-                id="stationLocation"
-                value={stationLocation}
-                onChange={(e) => setStationLocation(e.target.value)}
-                placeholder="e.g., 404 Not Found Rd, City G"
-                required
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stationStatus">Status</Label>
-              <Select value={stationStatus} onValueChange={setStationStatus}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                <Save className="h-4 w-4 mr-2" />
-                {currentStation ? 'Save Changes' : 'Add Station'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+      {/* Create/Edit Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              {modalMode === 'create' ? 'Add New Station' : 'Edit Station'}
+            </h2>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Station Code *
+                </label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g., ACC, KSI"
+                  disabled={modalMode === 'edit'}
+                  className={`w-full px-4 ${isMobile ? 'py-3 text-base' : 'py-2'} border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    formErrors.code ? 'border-red-500' : 'border-gray-300'
+                  } ${modalMode === 'edit' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                />
+                {formErrors.code && <p className="text-red-500 text-xs mt-1">{formErrors.code}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Station Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Accra Central Station"
+                  className={`w-full px-4 ${isMobile ? 'py-3 text-base' : 'py-2'} border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    formErrors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
+                <textarea
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="e.g., Ring Road Central, Accra"
+                  rows={3}
+                  className={`w-full px-4 ${isMobile ? 'py-3 text-base' : 'py-2'} border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    formErrors.address ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {formErrors.address && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.address}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contact Phone (Optional)
+                </label>
+                <input
+                  type="tel"
+                  value={formData.contact_phone}
+                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                  placeholder="e.g., 0241234567"
+                  className={`w-full px-4 ${isMobile ? 'py-3 text-base' : 'py-2'} border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    formErrors.contact_phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {formErrors.contact_phone && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.contact_phone}</p>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className={`flex-1 px-4 ${isMobile ? 'py-3 text-base' : 'py-2'} border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50`}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 px-4 ${isMobile ? 'py-3 text-base' : 'py-2'} bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400`}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Saving...' : modalMode === 'create' ? 'Create Station' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </SuperAdminLayout>
   );
 }
