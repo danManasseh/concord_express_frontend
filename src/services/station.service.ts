@@ -1,3 +1,4 @@
+import { PaginatedResponse } from '@/types/api.types';
 import api, { handleApiError } from './api';
 import { Station } from '@/types/user.types';
 
@@ -20,8 +21,8 @@ class StationService {
    */
   async getStations(): Promise<Station[]> {
     try {
-      const response = await api.get<Station[]>('/stations/');
-      return response.data;
+      const response = await api.get<PaginatedResponse<Station>>('/stations/');
+      return response.data.results;
     } catch (error) {
       throw new Error(handleApiError(error));
     }
@@ -30,7 +31,7 @@ class StationService {
   /**
    * Get station by ID
    */
-  async getStation(id: string): Promise<Station> {
+  async getStation(id: number): Promise<Station> {
     try {
       const response = await api.get<Station>(`/stations/${id}/`);
       return response.data;
@@ -54,7 +55,7 @@ class StationService {
   /**
    * Update station details (superadmin only)
    */
-  async updateStation(id: string, data: UpdateStationRequest): Promise<Station> {
+  async updateStation(id: number, data: UpdateStationRequest): Promise<Station> {
     try {
       const response = await api.put<Station>(`/stations/${id}/`, data);
       return response.data;
@@ -66,7 +67,7 @@ class StationService {
   /**
    * Deactivate station (superadmin only)
    */
-  async deactivateStation(id: string): Promise<Station> {
+  async deactivateStation(id: number): Promise<Station> {
     try {
       const response = await api.patch<Station>(`/stations/${id}/deactivate/`);
       return response.data;
@@ -78,7 +79,7 @@ class StationService {
   /**
    * Activate station (superadmin only)
    */
-  async activateStation(id: string): Promise<Station> {
+  async activateStation(id: number): Promise<Station> {
     try {
       const response = await api.patch<Station>(`/stations/${id}/activate/`);
       return response.data;
@@ -90,7 +91,7 @@ class StationService {
   /**
    * Delete station (superadmin only)
    */
-  async deleteStation(id: string): Promise<void> {
+  async deleteStation(id: number): Promise<void> {
     try {
       await api.delete(`/stations/${id}/`);
     } catch (error) {
@@ -101,7 +102,7 @@ class StationService {
   /**
    * Get station admins (superadmin only)
    */
-  async getStationAdmins(stationId: string): Promise<any[]> {
+  async getStationAdmins(stationId: number): Promise<any[]> {
     try {
       const response = await api.get(`/stations/${stationId}/admins/`);
       return response.data;

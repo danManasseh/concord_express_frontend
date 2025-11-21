@@ -1,18 +1,20 @@
 import api, { handleApiError } from './api';
+import { User } from '@/types/user.types';
 
-export interface User {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string;
-  role: 'user' | 'admin' | 'superadmin';
-  station: string | null;
-  station_name?: string;
-  station_code?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+
+// export interface User {
+//   id: string;
+//   name: string;
+//   email: string | null;
+//   phone: string;
+//   role: 'user' | 'admin' | 'superadmin';
+//   station: string | null;
+//   station_name?: string;
+//   station_code?: string;
+//   is_active: boolean;
+//   created_at: string;
+//   updated_at: string;
+// }
 
 export interface UserListResponse {
   count: number;

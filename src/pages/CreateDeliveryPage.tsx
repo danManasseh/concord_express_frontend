@@ -318,7 +318,7 @@ export default function CreateDeliveryPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {stations.map((station) => (
-                        <SelectItem key={station.id} value={station.id}>
+                    <SelectItem key={station.id} value={`${station.id}`}>
                           {station.name} ({station.code})
                         </SelectItem>
                       ))}
@@ -340,7 +340,7 @@ export default function CreateDeliveryPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {stations.map((station) => (
-                        <SelectItem key={station.id} value={station.id}>
+                        <SelectItem key={station.id} value={`${station.id}`}>
                           {station.name} ({station.code})
                         </SelectItem>
                       ))}

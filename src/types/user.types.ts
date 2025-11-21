@@ -1,18 +1,31 @@
 export type UserRole = 'user' | 'admin' | 'superadmin';
 
+export interface Station {
+  id: number;
+  name: string;
+  code: string;
+}
+
 export interface User {
-  id: string;
+  id: number;  // backend uses integers
   name: string;
   email: string | null;
   phone: string;
-  role: UserRole;
-  station?: Station;
+
+  role: "user" | "admin" | "superadmin";
   is_active: boolean;
+
+  // normalized station structure
+  station: Station | null;
+
+  // timestamps returned by backend
   created_at: string;
+  updated_at: string;
 }
 
+
 export interface Station {
-  id: string;
+  id: number;
   code: string;
   name: string;
   address: string;

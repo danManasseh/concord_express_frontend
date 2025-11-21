@@ -32,8 +32,8 @@ class ParcelService {
    */
   async getUserParcels(): Promise<Parcel[]> {
     try {
-      const response = await api.get<Parcel[]>('/parcels/my-parcels/');
-      return response.data;
+      const response = await api.get<PaginatedResponse<Parcel>>('/parcels/'); 
+      return response.data.results;
     } catch (error) {
       throw new Error(handleApiError(error));
     }
