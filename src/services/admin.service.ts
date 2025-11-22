@@ -1,3 +1,4 @@
+import { PaginatedResponse } from '@/types/api.types';
 import api, { handleApiError } from './api';
 import { User } from '@/types/user.types';
 
@@ -27,8 +28,8 @@ class AdminService {
     page?: number;
   }): Promise<User[]> {
     try {
-      const response = await api.get<User[]>('/admins/', { params });
-      return response.data;
+      const response = await api.get<PaginatedResponse<User>>('/admins/', { params });
+      return response.data.results;
     } catch (error) {
       throw new Error(handleApiError(error));
     }

@@ -1,3 +1,4 @@
+import { PaginatedResponse } from '@/types/api.types';
 import api, { handleApiError } from './api';
 import { Payment, CreatePaymentRequest } from '@/types/payment.types';
 
@@ -24,13 +25,12 @@ class PaymentService {
     page?: number;
   }): Promise<Payment[]> {
     try {
-      const response = await api.get<Payment[]>('/payments/', { params });
-      return response.data;
+      const response = await api.get<PaginatedResponse<Payment>>('/payments/', { params });
+      return response.data.results;
     } catch (error) {
       throw new Error(handleApiError(error));
     }
   }
-
   /**
    * Get payment by ID
    */
@@ -48,10 +48,10 @@ class PaymentService {
    */
   async getParcelPayments(parcelId: string): Promise<Payment[]> {
     try {
-      const response = await api.get<{ payments: Payment[] }>(
-        `/parcels/${parcelId}/payment/`
-      );
-      return response.data.payments;
+     const response = await api.get<PaginatedResponse<Payment>>(
+      `/parcels/${parcelId}/payment/`
+    );
+      return response.data.results;
     } catch (error) {
       throw new Error(handleApiError(error));
     }

@@ -179,15 +179,6 @@ export default function AdminLoginPage() {
                   Super Admin Login
                 </Link>
               </p>
-              <p className="text-gray-600">
-                Customer Portal:{' '}
-                <Link
-                  to="/login"
-                  className="text-indigo-600 hover:text-indigo-700 font-medium"
-                >
-                  Customer Login
-                </Link>
-              </p>
             </div>
           </CardContent>
         </Card>

@@ -30,7 +30,8 @@ import {
 } from 'lucide-react';
 import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
 import { useIsMobile } from '@/hooks/use-mobile';
-import userService, { User } from '@/services/userService';
+import userService from '@/services/userService'
+import { User } from '@/types/user.types';
 
 export default function SuperAdminUserOverviewPage() {
   const navigate = useNavigate();
@@ -112,7 +113,7 @@ export default function SuperAdminUserOverviewPage() {
       }
 
       // Update local state
-      setUsers(users.map((u) => (u.id === id ? { ...u, is_active: newStatus } : u)));
+      setUsers(users.map((u) => (`${u.id}` === id ? { ...u, is_active: newStatus } : u)));
 
       toast({
         title: 'Success',
@@ -242,10 +243,10 @@ export default function SuperAdminUserOverviewPage() {
                         variant={user.is_active ? 'destructive' : 'default'}
                         size="sm"
                         className="flex-1"
-                        onClick={() => handleToggleStatus(user.id, user.name, user.is_active)}
-                        disabled={isActionLoading === user.id}
+                        onClick={() => handleToggleStatus(`${user.id}`, user.name, user.is_active)}
+                        disabled={isActionLoading === `${user.id}`}
                       >
-                        {isActionLoading === user.id ? (
+                        {isActionLoading === `${user.id}` ? (
                           <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                         ) : user.is_active ? (
                           <XCircle className="h-4 w-4 mr-1" />
@@ -292,10 +293,10 @@ export default function SuperAdminUserOverviewPage() {
                             variant={user.is_active ? 'destructive' : 'default'}
                             size="sm"
                             className="h-8 text-xs"
-                            onClick={() => handleToggleStatus(user.id, user.name, user.is_active)}
-                            disabled={isActionLoading === user.id}
+                            onClick={() => handleToggleStatus(`${user.id}`, user.name, user.is_active)}
+                            disabled={isActionLoading === `${user.id}`}
                           >
-                            {isActionLoading === user.id ? (
+                            {isActionLoading === `${user.id}` ? (
                               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                             ) : user.is_active ? (
                               <XCircle className="h-4 w-4 mr-1" />

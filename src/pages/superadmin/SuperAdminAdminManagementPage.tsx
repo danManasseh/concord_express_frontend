@@ -84,7 +84,7 @@ export default function SuperAdminAdminManagementPage() {
       email: admin.email ?? '',
       phone: admin.phone,
       password: '', // Don't populate password
-      station: admin.station?.id || '',
+      station: `${admin.station?.id}` || '',
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -160,7 +160,7 @@ export default function SuperAdminAdminManagementPage() {
         if (formData.password) {
           updateData.password = formData.password;
         }
-        await adminService.updateAdmin(selectedAdmin.id, updateData);
+        await adminService.updateAdmin(`${selectedAdmin.id}`, updateData);
       }
 
       await loadData();
@@ -175,9 +175,9 @@ export default function SuperAdminAdminManagementPage() {
   const handleToggleActive = async (admin: User) => {
     try {
       if (admin.is_active) {
-        await adminService.deactivateAdmin(admin.id);
+        await adminService.deactivateAdmin(`${admin.id}`);
       } else {
-        await adminService.activateAdmin(admin.id);
+        await adminService.activateAdmin(`${admin.id}`);
       }
       await loadData();
     } catch (err) {
@@ -193,7 +193,7 @@ export default function SuperAdminAdminManagementPage() {
       admin.phone.includes(searchTerm);
 
     const matchesStation =
-      filterStation === 'all' || admin.station?.id === filterStation;
+      filterStation === 'all' || `${admin.station?.id }`=== filterStation;
 
     const matchesStatus =
       filterStatus === 'all' ||
