@@ -8,32 +8,26 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Package, Upload, X, Loader2 } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
 import parcelService from '@/services/parcel.service';
 import stationService from '@/services/station.service';
 import { Station } from '@/types/user.types';
 import { CreateParcelRequest, DeliveryType, PaymentResponsibility } from '@/types/parcel.types';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CreateDeliveryPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
+  const user = useRoleGuard(['user']);
+  const { toast } = useToast();
 
   // States
   const [stations, setStations] = useState<Station[]>([]);
   const [isLoadingStations, setIsLoadingStations] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
 
   // Sender Information (pre-fill from user data)
-  const [senderName, setSenderName] = useState(user?.name || '');
-  const [senderPhone, setSenderPhone] = useState(user?.phone || '');
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
   const [senderAddress, setSenderAddress] = useState('');
   
   // Recipient Information
@@ -48,7 +42,7 @@ export default function CreateDeliveryPage() {
   // Package Details
   const [description, setDescription] = useState('');
   const [weight, setWeight] = useState('');
-  const [amount, setAmount] = useState('');
+  const [declaredValue, setDeclaredValue] = useState('');
   const [deliveryType, setDeliveryType] = useState<DeliveryType>('standard');
   
   // Payment
@@ -58,22 +52,34 @@ export default function CreateDeliveryPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
 
+  // Pre-fill sender information from user data
+  useEffect(() => {
+    if (user) {
+      setSenderName(user.name || '');
+      setSenderPhone(user.phone || '');
+    }
+  }, [user]);
+
   // Fetch stations on mount
   useEffect(() => {
     const fetchStations = async () => {
       try {
         const data = await stationService.getStations();
         setStations(data);
-      } catch (err) {
-        console.error('Failed to load stations:', err);
-        setError('Failed to load stations. Please refresh the page.');
+      } catch (error) {
+        console.error('Failed to load stations:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load stations. Please refresh the page.',
+          variant: 'destructive',
+        });
       } finally {
         setIsLoadingStations(false);
       }
     };
 
     fetchStations();
-  }, []);
+  }, [toast]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -94,7 +100,6 @@ export default function CreateDeliveryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsSubmitting(true);
 
     try {
@@ -102,16 +107,16 @@ export default function CreateDeliveryPage() {
       const parcelData: CreateParcelRequest = {
         sender_name: senderName,
         sender_phone: senderPhone,
-        sender_address: senderAddress,
+        sender_address: senderAddress || '', // Empty string if not provided
         recipient_name: recipientName,
         recipient_phone: recipientPhone,
-        recipient_address: recipientAddress,
-        origin_station: originStation,
-        destination_station: destinationStation,
+        recipient_address: recipientAddress || '', // Empty string if not provided
+        origin_station: originStation, // Already string from Select
+        destination_station: destinationStation, // Already string from Select
         description: description,
         item_count: 1,
         weight: weight ? parseFloat(weight) : undefined,
-        declared_value: parseFloat(amount),
+        declared_value: parseFloat(declaredValue),
         delivery_type: deliveryType,
         payment_status: 'unpaid', // Customer orders start as unpaid
         payment_responsibility: paymentResponsibility,
@@ -127,13 +132,30 @@ export default function CreateDeliveryPage() {
         } catch (photoErr) {
           console.error('Failed to upload photo:', photoErr);
           // Don't fail the entire order if photo upload fails
+          toast({
+            title: 'Warning',
+            description: 'Order created but photo upload failed.',
+            variant: 'destructive',
+          });
         }
       }
 
-      // Navigate to confirmation page
-      navigate(`/order-confirmation/${createdParcel.tracking_code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create order. Please try again.');
+      // Show success message
+      toast({
+        title: 'Success',
+        description: `Your order ${createdParcel.tracking_code} has been created!`,
+      });
+
+      // Navigate to confirmation page or deliveries page
+      navigate(`/my-deliveries`);
+      
+    } catch (error) {
+      console.error('Failed to create order:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create order. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -167,6 +189,7 @@ export default function CreateDeliveryPage() {
             variant="ghost"
             onClick={() => navigate('/my-deliveries')}
             className="mb-4"
+            disabled={isSubmitting}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
@@ -180,13 +203,6 @@ export default function CreateDeliveryPage() {
               Fill in the details to create a new parcel delivery
             </p>
           </div>
-
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Sender Information */}
@@ -227,7 +243,7 @@ export default function CreateDeliveryPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="senderAddress">
-                    Address <span className="text-red-500">*</span>
+                    Address <span className="text-muted-foreground text-xs">(Optional)</span>
                   </Label>
                   <Input
                     id="senderAddress"
@@ -235,7 +251,6 @@ export default function CreateDeliveryPage() {
                     placeholder="Enter sender's address"
                     value={senderAddress}
                     onChange={(e) => setSenderAddress(e.target.value)}
-                    required
                     disabled={isSubmitting}
                     className="h-11"
                   />
@@ -281,7 +296,7 @@ export default function CreateDeliveryPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="recipientAddress">
-                    Address <span className="text-red-500">*</span>
+                    Address <span className="text-muted-foreground text-xs">(Optional)</span>
                   </Label>
                   <Input
                     id="recipientAddress"
@@ -289,7 +304,6 @@ export default function CreateDeliveryPage() {
                     placeholder="Enter recipient's address"
                     value={recipientAddress}
                     onChange={(e) => setRecipientAddress(e.target.value)}
-                    required
                     disabled={isSubmitting}
                     className="h-11"
                   />
@@ -318,8 +332,8 @@ export default function CreateDeliveryPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {stations.map((station) => (
-                    <SelectItem key={station.id} value={`${station.id}`}>
-                          {station.name} ({station.code})
+                        <SelectItem key={station.id} value={String(station.id)}>
+                          {station.name} - {station.region}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -340,8 +354,8 @@ export default function CreateDeliveryPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {stations.map((station) => (
-                        <SelectItem key={station.id} value={`${station.id}`}>
-                          {station.name} ({station.code})
+                        <SelectItem key={station.id} value={String(station.id)}>
+                          {station.name} - {station.region}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -386,16 +400,16 @@ export default function CreateDeliveryPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount">
+                  <Label htmlFor="declaredValue">
                     Declared Value (GHS) <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="amount"
+                    id="declaredValue"
                     type="number"
                     step="0.01"
                     placeholder="Enter package value"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    value={declaredValue}
+                    onChange={(e) => setDeclaredValue(e.target.value)}
                     required
                     disabled={isSubmitting}
                     className="h-11"

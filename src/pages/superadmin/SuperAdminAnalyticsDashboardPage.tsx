@@ -17,18 +17,17 @@ import {
   TrendingUp,
   Users,
   MapPin,
-  Calendar,
-  Download,
   Loader2,
   CheckCircle,
   Clock,
   XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
-import { useAuthStore } from '@/stores/authStore';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 import analyticsService from '@/services/analyticsService';
 import stationService from '@/services/station.service';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Station } from '@/types/user.types';
 
 // Chart colors
@@ -36,7 +35,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export default function SuperAdminAnalyticsDashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const user = useRoleGuard(['superadmin']);
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +46,6 @@ export default function SuperAdminAnalyticsDashboardPage() {
   // Filters
   const [timeRange, setTimeRange] = useState('30');
   const [selectedStation, setSelectedStation] = useState('all');
-  const [isExporting, setIsExporting] = useState(false);
 
   // Load static data (stations) once on mount
   useEffect(() => {
@@ -69,10 +67,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
 
   // Load dynamic data when filters change
   useEffect(() => {
-    if (!user || user.role !== 'superadmin') {
-      navigate('/superadmin/login');
-      return;
-    }
+    if (!user) return;
 
     const loadDashboardData = async () => {
       try {
@@ -89,6 +84,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
           ...(selectedStation !== 'all' && { station_id: selectedStation }),
         };
 
+        // ✅ Only call endpoints that exist
         const [dashboardStats, parcelData] = await Promise.all([
           analyticsService.getDashboardStats(),
           analyticsService.getParcelStats(params),
@@ -97,6 +93,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
         setStats(dashboardStats);
         setParcelStats(parcelData);
       } catch (error) {
+        console.error('Analytics error:', error);
         toast({
           title: 'Error',
           description: error instanceof Error ? error.message : 'Failed to load analytics data',
@@ -108,58 +105,17 @@ export default function SuperAdminAnalyticsDashboardPage() {
     };
 
     loadDashboardData();
-  }, [user, navigate, timeRange, selectedStation, toast]);
-
-  const handleExport = async (format: 'csv' | 'pdf') => {
-    try {
-      setIsExporting(true);
-      
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - parseInt(timeRange));
-
-      const blob = await analyticsService.exportReport({
-        report_type: 'delivery_performance',
-        format,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        ...(selectedStation !== 'all' && { station_id: selectedStation }),
-      });
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `analytics-report-${new Date().toISOString().split('T')[0]}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast({
-        title: 'Success',
-        description: `Report exported as ${format.toUpperCase()}`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to export report',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  }, [user, timeRange, selectedStation, toast]);
 
   // Prepare chart data
   const statusChartData = parcelStats?.by_status
     ? [
-        { name: 'Pending', value: parcelStats.by_status.pending, color: COLORS[2] },
-        { name: 'In Transit', value: parcelStats.by_status.in_transit, color: COLORS[0] },
-        { name: 'Arrived', value: parcelStats.by_status.arrived, color: COLORS[4] },
-        { name: 'Delivered', value: parcelStats.by_status.delivered, color: COLORS[1] },
-        { name: 'Cancelled', value: parcelStats.by_status.cancelled, color: COLORS[3] },
-      ]
+        { name: 'Pending', value: parcelStats.by_status.pending || 0, color: COLORS[2] },
+        { name: 'In Transit', value: parcelStats.by_status.in_transit || 0, color: COLORS[0] },
+        { name: 'Arrived', value: parcelStats.by_status.arrived || 0, color: COLORS[4] },
+        { name: 'Delivered', value: parcelStats.by_status.delivered || 0, color: COLORS[1] },
+        { name: 'Cancelled', value: parcelStats.by_status.cancelled || 0, color: COLORS[3] },
+      ].filter(item => item.value > 0) // Only show statuses with data
     : [];
 
   if (!user) return null;
@@ -189,33 +145,17 @@ export default function SuperAdminAnalyticsDashboardPage() {
                 Comprehensive system performance and insights
               </p>
             </div>
+          </div>
+        </div>
 
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => handleExport('csv')}
-                disabled={isExporting || isLoading}
-              >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Export CSV
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleExport('pdf')}
-                disabled={isExporting || isLoading}
-              >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Export PDF
-              </Button>
-            </div>
+        {/* Info Alert - Export Feature Coming Soon */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-900">Export Feature Coming Soon</p>
+            <p className="text-xs text-blue-700 mt-1">
+              Report export functionality will be available in the next update.
+            </p>
           </div>
         </div>
 
@@ -254,7 +194,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
                   <SelectContent>
                     <SelectItem value="all">All Stations</SelectItem>
                     {stations.map((station) => (
-                      <SelectItem key={station.id} value={`${station.id}`}>
+                      <SelectItem key={station.id} value={String(station.id)}>
                         {station.name}
                       </SelectItem>
                     ))}
@@ -267,7 +207,10 @@ export default function SuperAdminAnalyticsDashboardPage() {
 
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading analytics data...</p>
+            </div>
           </div>
         ) : (
           <>
@@ -281,7 +224,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
                         Total Parcels
                       </p>
                       <p className="text-2xl font-bold mt-2">
-                        {stats?.stats?.total_parcels || 0}
+                        {stats?.stats?.total_parcels || parcelStats?.total || 0}
                       </p>
                     </div>
                     <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -335,7 +278,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
                         Active Stations
                       </p>
                       <p className="text-2xl font-bold mt-2">
-                        {stats?.stats?.active_stations || 0}
+                        {stats?.stats?.active_stations || stations.filter(s => s.is_active).length || 0}
                       </p>
                     </div>
                     <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center">
@@ -346,7 +289,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
               </Card>
             </div>
 
-            {/* Charts Row 1 */}
+            {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Parcel Status Distribution */}
               <Card>
@@ -356,27 +299,33 @@ export default function SuperAdminAnalyticsDashboardPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={statusChartData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) =>
-                          `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
-                        }
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {statusChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {statusChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={statusChartData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) =>
+                            `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
+                          }
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {statusChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No parcel data available for selected period
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

@@ -12,44 +12,25 @@ import {
   List,
   Truck,
   DollarSign,
-  Loader2,
+  // Bell,
 } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 import api from '@/services/api';
+import { DataState } from '@/components/common/DataState';
+import { DashboardStats } from '@/types/dashboard.types';
+// import { getParcelStatusColor } from '@/lib/statusColors';
 
-interface DashboardStats {
-  stats: {
-    in_transit: number;
-    arrived: number;
-    delivered_today: number;
-    total_today: number;
-  };
-  recent_activity: Array<{
-    type: string;
-    message: string;
-    timestamp: string;
-    tracking_code?: string;
-    batch_id?: string;
-  }>;
-}
 
 export default function AdminDashboardPage() {
+  const user = useRoleGuard(['admin']);  // ← ADD THIS (replaces 8 lines!)
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+
   
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Redirect if not admin
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      navigate('/admin/login');
-      return;
-    }
-  }, [user, navigate]);
-
-  // Fetch dashboard stats
+  
+   // Fetch dashboard stats
   useEffect(() => {
     const fetchStats = async () => {
       if (!user?.station?.id) return;
@@ -67,12 +48,8 @@ export default function AdminDashboardPage() {
       }
     };
 
-    if (user?.station) {
-      fetchStats();
-    }
+    fetchStats();
   }, [user]);
-
-  if (!user) return null;
 
   // Get activity icon based on type
   const getActivityIcon = (type: string) => {
@@ -87,25 +64,13 @@ export default function AdminDashboardPage() {
         return <Clock className="h-5 w-5 text-gray-600" />;
     }
   };
+  if (!user) return null;
 
-  const getActivityBgColor = (type: string) => {
-    switch (type) {
-      case 'parcel_created':
-        return 'bg-blue-100';
-      case 'parcel_delivered':
-        return 'bg-green-100';
-      case 'batch_departed':
-        return 'bg-orange-100';
-      default:
-        return 'bg-gray-100';
-    }
-  };
 
-  return (
+ return (
     <div className="min-h-screen bg-background">
       <AdminHeader adminData={user} notificationCount={3} />
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Welcome Section */}
         <div className="mb-8">
@@ -113,17 +78,10 @@ export default function AdminDashboardPage() {
             Welcome back, {user.name}
           </h2>
           <p className="text-muted-foreground">
-            Here's what's happening at {user.station?.name || 'your station'} today
+            {user.station ? `${user.station.name} Station` : 'Station Admin Dashboard'}
           </p>
         </div>
 
-        {/* Error Alert */}
-        {error && (
-          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        )}
-        
         {/* Quick Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Button
@@ -139,7 +97,7 @@ export default function AdminDashboardPage() {
             className="h-20 text-lg"
           >
             <List className="h-5 w-5 mr-2" />
-            Manage Parcels
+            View All Parcels
           </Button>
           <Button
             variant="outline"
@@ -147,7 +105,7 @@ export default function AdminDashboardPage() {
             className="h-20 text-lg"
           >
             <Truck className="h-5 w-5 mr-2" />
-            Bus Arrival / Bulk Update
+            Bulk Update
           </Button>
           <Button
             variant="outline"
@@ -155,121 +113,132 @@ export default function AdminDashboardPage() {
             className="h-20 text-lg"
           >
             <DollarSign className="h-5 w-5 mr-2" />
-            Payment Records
+            Payments
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : stats ? (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+        {/* ✅ Section 4: DataState handles loading/error/empty */}
+        <DataState
+          isLoading={isLoading}
+          error={error}
+          data={stats}
+          loadingText="Loading dashboard statistics..."
+        >
+          {stats && (
+            <>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      In Transit
+                    </CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-foreground">
+                      {stats.stats.in_transit}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Currently moving</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Arrived
+                    </CardTitle>
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-foreground">
+                      {stats.stats.arrived}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">At your station</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Delivered Today
+                    </CardTitle>
+                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-foreground">
+                      {stats.stats.delivered_today}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Completed</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Total Today
+                    </CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-foreground">
+                      {stats.stats.total_today}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">All activities</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Recent Activity */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    In Transit
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold text-foreground">
+                    Recent Activity
                   </CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">
-                    {stats.stats.in_transit}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">From this station</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Arrived
-                  </CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">
-                    {stats.stats.arrived}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">At this station</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Delivered
-                  </CardTitle>
-                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">
-                    {stats.stats.delivered_today}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Today</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Today
-                  </CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">
-                    {stats.stats.total_today}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">All activities</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-foreground">
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.recent_activity.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No recent activity
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {stats.recent_activity.map((activity, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg"
-                      >
+                  {stats.recent_activity.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      No recent activity
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {stats.recent_activity.map((activity, index) => (
                         <div
-                          className={`h-10 w-10 rounded-full ${getActivityBgColor(
-                            activity.type
-                          )} flex items-center justify-center`}
+                          key={index}
+                          className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg"
                         >
-                          {getActivityIcon(activity.type)}
+                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                            {getActivityIcon(activity.type)}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {activity.message}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(activity.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          {activity.tracking_code && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                navigate(`/admin/parcels/${activity.tracking_code}`)
+                              }
+                            >
+                              View
+                            </Button>
+                          )}
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">
-                            {activity.message}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(activity.timestamp).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        ) : null}
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </DataState>
       </div>
     </div>
   );

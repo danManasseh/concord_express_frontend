@@ -27,10 +27,11 @@ import parcelService from '@/services/parcel.service';
 import { Parcel } from '@/types/parcel.types';
 import { useToast } from '@/hooks/use-toast';
 import Header from '@/components/Header';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 
 export default function MyDeliveriesPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const user = useRoleGuard(['user'])
   const { toast } = useToast();
 
   const [parcels, setParcels] = useState<Parcel[]>([]);
@@ -40,11 +41,7 @@ export default function MyDeliveriesPage() {
   const [notificationCount] = useState(3); // TODO: Get from API
 
   // Check if user is logged in
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
+  
 
   // Fetch user's parcels
   useEffect(() => {

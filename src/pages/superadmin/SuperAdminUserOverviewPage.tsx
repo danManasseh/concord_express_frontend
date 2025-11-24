@@ -32,48 +32,41 @@ import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
 import { useIsMobile } from '@/hooks/use-mobile';
 import userService from '@/services/userService'
 import { User } from '@/types/user.types';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 
 export default function SuperAdminUserOverviewPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { toast } = useToast();
-  const [superAdminData, setSuperAdminData] = useState<any>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
+  const user = useRoleGuard(['superadmin']);
 
-  useEffect(() => {
-    const superadmin = localStorage.getItem('superadmin');
-    if (!superadmin) {
-      navigate('/superadmin/login');
-      return;
+// Then update the data fetching useEffect:
+useEffect(() => {
+  if (!user) return;
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await userService.getAllUsers();
+      setUsers(response.results);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch users',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
-    setSuperAdminData(JSON.parse(superadmin));
-  }, [navigate]);
+  };
 
-  useEffect(() => {
-    if (!superAdminData) return;
-
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      try {
-        const response = await userService.getAllUsers();
-        setUsers(response.results);
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to fetch users',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUsers();
-  }, [superAdminData, toast]);
+  fetchUsers();
+}, [user, toast]);
 
   const getStatusColor = (isActive: boolean) => {
     return isActive
@@ -130,11 +123,11 @@ export default function SuperAdminUserOverviewPage() {
     }
   };
 
-  if (!superAdminData) return null;
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">
-      <SuperAdminHeader adminData={superAdminData} notificationCount={5} />
+      <SuperAdminHeader adminData={user} notificationCount={5} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">

@@ -16,9 +16,9 @@ import {
   Building,
 } from 'lucide-react';
 import AdminHeader from '@/components/admin/AdminHeader';
-import { useAuthStore } from '@/stores/authStore';
 import profileService from '@/services/profileService';
 import { User } from '@/types/user.types';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function AdminProfilePage() {
   const navigate = useNavigate();

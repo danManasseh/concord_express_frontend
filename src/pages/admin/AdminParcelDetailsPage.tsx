@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Loader2, Package, MapPin, User, DollarSign, Save, X } from 'lucide-react';
 import AdminHeader from '@/components/admin/AdminHeader';
-import { useAuthStore } from '@/stores/authStore';
 import parcelService from '@/services/parcel.service';
 import stationService from '@/services/station.service';
 import { ParcelDetail } from '@/types/parcel.types';
 import { Station } from '@/types/user.types';
 import { useToast } from '@/hooks/use-toast';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 
 interface EditableFields {
   sender_name: string;
@@ -32,8 +32,8 @@ interface EditableFields {
 export default function AdminParcelDetailsPage() {
   const navigate = useNavigate();
   const { parcelId } = useParams<{ parcelId: string }>();
-  const { user } = useAuthStore();
   const { toast } = useToast();
+  const user = useRoleGuard(['admin', 'superadmin'])
 
   const [parcel, setParcel] = useState<ParcelDetail | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
@@ -43,13 +43,6 @@ export default function AdminParcelDetailsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [editedFields, setEditedFields] = useState<EditableFields | null>(null);
-
-  // Redirect if not admin
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      navigate('/admin/login');
-    }
-  }, [user, navigate]);
 
   // Fetch parcel details and stations
   useEffect(() => {
@@ -68,10 +61,10 @@ export default function AdminParcelDetailsPage() {
         setEditedFields({
           sender_name: parcelData.sender_name,
           sender_phone: parcelData.sender_phone,
-          sender_address: parcelData.sender_address,
+          sender_address: parcelData.sender_address || '',
           recipient_name: parcelData.recipient_name,
           recipient_phone: parcelData.recipient_phone,
-          recipient_address: parcelData.recipient_address,
+          recipient_address: parcelData.recipient_address || '',
           destination_station: parcelData.destination_station,
           description: parcelData.description,
           item_count: parcelData.item_count,
@@ -170,10 +163,10 @@ export default function AdminParcelDetailsPage() {
       setEditedFields({
         sender_name: parcel.sender_name,
         sender_phone: parcel.sender_phone,
-        sender_address: parcel.sender_address,
+        sender_address: parcel.sender_address || '',
         recipient_name: parcel.recipient_name,
         recipient_phone: parcel.recipient_phone,
-        recipient_address: parcel.recipient_address,
+        recipient_address: parcel.recipient_address || '',
         destination_station: parcel.destination_station,
         description: parcel.description,
         item_count: parcel.item_count,
@@ -219,10 +212,10 @@ export default function AdminParcelDetailsPage() {
       setEditedFields({
         sender_name: updatedParcel.sender_name,
         sender_phone: updatedParcel.sender_phone,
-        sender_address: updatedParcel.sender_address,
+        sender_address: updatedParcel.sender_address || '',
         recipient_name: updatedParcel.recipient_name,
         recipient_phone: updatedParcel.recipient_phone,
-        recipient_address: updatedParcel.recipient_address,
+        recipient_address: updatedParcel.recipient_address || '',
         destination_station: updatedParcel.destination_station,
         description: updatedParcel.description,
         item_count: updatedParcel.item_count,

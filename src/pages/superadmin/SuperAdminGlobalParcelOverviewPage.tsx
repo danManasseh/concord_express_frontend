@@ -30,7 +30,6 @@ import {
   Clock,
   CheckCircle,
 } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import parcelService from '@/services/parcel.service';
 import stationService from '@/services/station.service';
@@ -38,10 +37,12 @@ import { Parcel } from '@/types/parcel.types';
 import { Station } from '@/types/user.types';
 import { useToast } from '@/hooks/use-toast';
 import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
+import { getParcelStatusColor, getPaymentStatusColor, formatStatusText } from '@/lib/statusColors'; // ✅ ADD THIS
 
 export default function SuperAdminGlobalParcelOverviewPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const user = useRoleGuard(['superadmin']);
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
@@ -52,13 +53,6 @@ export default function SuperAdminGlobalParcelOverviewPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [originFilter, setOriginFilter] = useState('all');
   const [destinationFilter, setDestinationFilter] = useState('all');
-
-  // Redirect if not authenticated or not superadmin
-  useEffect(() => {
-    if (!user || user.role !== 'superadmin') {
-      navigate('/login');
-    }
-  }, [user, navigate]);
 
   // Load data
   useEffect(() => {
@@ -87,46 +81,9 @@ export default function SuperAdminGlobalParcelOverviewPage() {
     }
   }, [user, toast]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'created':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'in_transit':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'arrived':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'delivered':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'failed':
-        return 'bg-red-100 text-red-800 border-red-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'unpaid':
-        return 'bg-red-100 text-red-800 border-red-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getDisplayStatus = (status: string) => {
-    const statusMap: Record<string, string> = {
-      created: 'Payment Pending',
-      in_transit: 'In Transit',
-      arrived: 'Arrived',
-      delivered: 'Delivered',
-      failed: 'Failed',
-    };
-    return statusMap[status] || status;
-  };
+  // ❌ REMOVED getStatusColor - using utility
+  // ❌ REMOVED getPaymentStatusColor - using utility
+  // ❌ REMOVED getDisplayStatus - using formatStatusText utility
 
   const filteredParcels = parcels.filter((parcel) => {
     const matchesSearch =
@@ -166,7 +123,7 @@ export default function SuperAdminGlobalParcelOverviewPage() {
       p.recipient_name,
       p.origin_station_name,
       p.destination_station_name,
-      p.status,
+      formatStatusText(p.status), // ✅ Use utility
       p.payment_status,
       new Date(p.created_at).toLocaleDateString(),
     ]);
@@ -183,6 +140,11 @@ export default function SuperAdminGlobalParcelOverviewPage() {
     a.download = `parcels-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Success',
+      description: 'Parcel data exported successfully',
+    });
   };
 
   if (!user) return null;
@@ -303,7 +265,7 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                   <SelectContent>
                     <SelectItem value="all">All Origins</SelectItem>
                     {stations.map((station) => (
-                      <SelectItem key={station.id} value={station.id.toString()}>
+                      <SelectItem key={station.id} value={String(station.id)}>
                         {station.name}
                       </SelectItem>
                     ))}
@@ -316,7 +278,7 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                   <SelectContent>
                     <SelectItem value="all">All Destinations</SelectItem>
                     {stations.map((station) => (
-                      <SelectItem key={station.id} value={station.id.toString()}>
+                      <SelectItem key={station.id} value={String(station.id)}>
                         {station.name}
                       </SelectItem>
                     ))}
@@ -356,8 +318,8 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                           {parcel.tracking_code}
                         </p>
                       </div>
-                      <Badge variant="outline" className={getStatusColor(parcel.status)}>
-                        {getDisplayStatus(parcel.status)}
+                      <Badge variant="outline" className={getParcelStatusColor(parcel.status)}>
+                        {formatStatusText(parcel.status)}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm">
@@ -404,7 +366,7 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                         variant="outline"
                         size="sm"
                         className="flex-1"
-                        onClick={() => navigate(`/admin/parcels/${parcel.tracking_code}`)}
+                        onClick={() => navigate(`/admin/parcels/${parcel.id}`)}
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         View Details
@@ -439,8 +401,8 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                         <TableCell>{parcel.origin_station_name}</TableCell>
                         <TableCell>{parcel.destination_station_name}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getStatusColor(parcel.status)}>
-                            {getDisplayStatus(parcel.status)}
+                          <Badge variant="outline" className={getParcelStatusColor(parcel.status)}>
+                            {formatStatusText(parcel.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -461,7 +423,7 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                               size="icon"
                               className="h-8 w-8"
                               onClick={() =>
-                                navigate(`/admin/parcels/${parcel.tracking_code}`)
+                                navigate(`/admin/parcels/${parcel.id}`)
                               }
                             >
                               <Eye className="h-4 w-4" />

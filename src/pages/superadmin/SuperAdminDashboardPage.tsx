@@ -14,23 +14,16 @@ import {
   Loader2,
 } from 'lucide-react';
 import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
-import { useAuthStore } from '@/stores/authStore';
 import adminService from '@/services/admin.service';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 
 export default function SuperAdminDashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const user = useRoleGuard(['superadmin']);
 
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Redirect if not superadmin
-  useEffect(() => {
-    if (!user || user.role !== 'superadmin') {
-      navigate('/superadmin/login');
-    }
-  }, [user, navigate]);
 
   // Fetch dashboard stats
   useEffect(() => {
@@ -128,7 +121,7 @@ export default function SuperAdminDashboardPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate('/superadmin/users')}
+            onClick={() => navigate('/users/')}
             className="h-20 text-base"
           >
             <Users className="h-5 w-5 mr-2" />

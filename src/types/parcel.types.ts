@@ -8,10 +8,10 @@ export interface Parcel {
   tracking_code: string;
   sender_name: string;
   sender_phone: string;
-  sender_address: string;
+  sender_address: string | null;
   recipient_name: string;
   recipient_phone: string;
-  recipient_address: string;
+  recipient_address: string | null;
   origin_station: string;
   origin_station_name: string;
   origin_station_code: string;

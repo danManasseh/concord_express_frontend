@@ -36,18 +36,6 @@ class ParcelService {
   }
 
   /**
-   * Get parcel by tracking code (public)
-   */
-  // async trackParcel(trackingCode: string): Promise<ParcelDetail> {
-  //   try {
-  //     const response = await api.get<ParcelDetail>(`/track/${trackingCode}/`);
-  //     return response.data;
-  //   } catch (error) {
-  //     throw new Error(handleApiError(error));
-  //   }
-  // }
-
-  /**
    * Get user's parcels
    */
   async getUserParcels(): Promise<Parcel[]> {

@@ -120,7 +120,7 @@ function App() {
         <Route
           path="/admin/bus-arrival"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
               <AdminBusArrivalPage />
             </ProtectedRoute>
           }
@@ -136,7 +136,7 @@ function App() {
         <Route
           path="/admin/payments"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
               <AdminPaymentRecordsPage />
             </ProtectedRoute>
           }
@@ -144,7 +144,7 @@ function App() {
         <Route
           path="/admin/payments/:paymentId"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
               <AdminPaymentDetailsPage />
             </ProtectedRoute>
           }
@@ -233,7 +233,7 @@ function App() {
         />
 
         <Route
-          path="/superadmin/users"
+          path="/users/"
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
               <SuperAdminUserOverviewPage />

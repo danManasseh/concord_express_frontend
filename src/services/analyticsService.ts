@@ -1,22 +1,5 @@
 import api, { handleApiError } from './api';
-
-export interface DashboardStats {
-  stats: {
-    active_stations: number;
-    total_parcels: number;
-    total_revenue: number;
-    delivery_success_rate: number;
-    parcels_in_transit?: number;
-    parcels_delivered?: number;
-    parcels_pending?: number;
-    active_users?: number;
-  };
-  recent_activity: Array<{
-    type: string;
-    message: string;
-    timestamp: string;
-  }>;
-}
+import { DashboardStats } from '@/types/dashboard.types';
 
 export interface ParcelStats {
   total: number;
@@ -29,25 +12,16 @@ export interface ParcelStats {
   };
 }
 
-export interface RevenueStats {
-  total: number;
-  by_period: Array<{
-    date: string;
-    amount: number;
-  }>;
-}
-
-export interface StationPerformance {
-  station_id: string;
-  station_name: string;
-  total_parcels: number;
-  delivered_parcels: number;
-  success_rate: number;
+export interface UserStats {
+  total_users: number;
+  active_users: number;
+  new_users_this_month: number;
 }
 
 class AnalyticsService {
   /**
    * Get super admin dashboard statistics
+   * GET /api/dashboard/superadmin/
    */
   async getDashboardStats(): Promise<DashboardStats> {
     try {
@@ -60,7 +34,8 @@ class AnalyticsService {
 
   /**
    * Get parcel statistics
-   * Can filter by date range
+   * GET /api/admin/parcels/stats/
+   * Can filter by date range and station
    */
   async getParcelStats(params?: {
     start_date?: string;
@@ -68,23 +43,7 @@ class AnalyticsService {
     station_id?: string;
   }): Promise<ParcelStats> {
     try {
-      const response = await api.get<ParcelStats>('/admin/parcels/stats/', { params });
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error));
-    }
-  }
-
-  /**
-   * Get revenue statistics
-   */
-  async getRevenueStats(params?: {
-    start_date?: string;
-    end_date?: string;
-    station_id?: string;
-  }): Promise<RevenueStats> {
-    try {
-      const response = await api.get<RevenueStats>('/admin/revenue/stats/', { params });
+      const response = await api.get<ParcelStats>('/parcels/stats/', { params });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
@@ -93,14 +52,11 @@ class AnalyticsService {
 
   /**
    * Get user statistics
+   * GET /api/admin/users/stats/
    */
-  async getUserStats(): Promise<{
-    total_users: number;
-    active_users: number;
-    new_users_this_month: number;
-  }> {
+  async getUserStats(): Promise<UserStats> {
     try {
-      const response = await api.get('/admin/users/stats/');
+      const response = await api.get<UserStats>('/users/stats/');
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
@@ -108,35 +64,15 @@ class AnalyticsService {
   }
 
   /**
-   * Get station performance data
+   * Get station statistics
+   * GET /api/stations/{id}/statistics/
    */
-  async getStationPerformance(params?: {
+  async getStationStatistics(stationId: string, params?: {
     start_date?: string;
     end_date?: string;
-  }): Promise<StationPerformance[]> {
+  }): Promise<any> {
     try {
-      const response = await api.get<StationPerformance[]>('/admin/stations/performance/', { params });
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error));
-    }
-  }
-
-  /**
-   * Export analytics report
-   */
-  async exportReport(params: {
-    report_type: 'delivery_performance' | 'revenue_summary' | 'station_performance' | 'user_activity';
-    format: 'csv' | 'pdf';
-    start_date?: string;
-    end_date?: string;
-    station_id?: string;
-  }): Promise<Blob> {
-    try {
-      const response = await api.get('/admin/reports/export/', {
-        params,
-        responseType: 'blob',
-      });
+      const response = await api.get(`/stations/${stationId}/statistics/`, { params });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));

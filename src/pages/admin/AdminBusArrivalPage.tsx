@@ -6,12 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Search, Truck, Package, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import AdminHeader from '@/components/admin/AdminHeader';
-import { useAuthStore } from '@/stores/authStore';
 import batchService, { Batch } from '@/services/batch.service';
+import { useRoleGuard } from '@/hooks/useRoleGuard';
 
 export default function AdminBusArrivalPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const user = useRoleGuard(['admin'])
 
   const [batchId, setBatchId] = useState('');
   const [batch, setBatch] = useState<Batch | null>(null);
@@ -20,12 +20,6 @@ export default function AdminBusArrivalPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Redirect if not admin
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      navigate('/admin/login');
-    }
-  }, [user, navigate]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
