@@ -18,6 +18,7 @@ import {
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useAuthStore } from '@/stores/authStore';
 import profileService from '@/services/profileService';
+import { User } from '@/types/user.types';
 
 export default function AdminProfilePage() {
   const navigate = useNavigate();
@@ -105,7 +106,18 @@ export default function AdminProfilePage() {
         phone,
       });
 
-      setUser(updatedUser);
+      const mergedUser = {
+        ...user,
+        ...updatedUser,
+      } as User;
+      
+      setUser(mergedUser);
+
+      // Re-populate form fields with updated data
+      setName(mergedUser.name || '');
+      setEmail(mergedUser.email || '');
+      setPhone(mergedUser.phone || '');
+
 
       toast({
         title: 'Success',

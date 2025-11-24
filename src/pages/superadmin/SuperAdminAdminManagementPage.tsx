@@ -84,7 +84,7 @@ export default function SuperAdminAdminManagementPage() {
       email: admin.email ?? '',
       phone: admin.phone,
       password: '', // Don't populate password
-      station: `${admin.station?.id}` || '',
+      station: admin.station?.id ? String(admin.station.id) : '',
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -113,7 +113,7 @@ export default function SuperAdminAdminManagementPage() {
     }
 
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      // errors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Invalid email address';
     }
@@ -138,24 +138,36 @@ export default function SuperAdminAdminManagementPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    if (!validateForm()) return;
+      if (!validateForm()) return;
 
-    try {
-      setIsSubmitting(true);
-      setError(null);
+      try {
+        setIsSubmitting(true);
+        setError(null);
 
+        const stationId = formData.station
+
+      if (!stationId || stationId.trim() === '') {
+    setError('Please select a valid station');
+    setIsSubmitting(false);
+    return;
+    }
       if (modalMode === 'create') {
-        await adminService.createAdmin(formData);
+        await adminService.createAdmin({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          station: stationId,
+        });
       } else if (selectedAdmin) {
-        // For edit, only send changed fields (exclude password if empty)
         const updateData: any = {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          station: formData.station,
+          station: stationId,
         };
         if (formData.password) {
           updateData.password = formData.password;
@@ -170,7 +182,7 @@ export default function SuperAdminAdminManagementPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+    };
 
   const handleToggleActive = async (admin: User) => {
     try {
@@ -189,7 +201,7 @@ export default function SuperAdminAdminManagementPage() {
   const filteredAdmins = admins.filter((admin) => {
     const matchesSearch =
       admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      // admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      admin.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       admin.phone.includes(searchTerm);
 
     const matchesStation =
@@ -570,7 +582,6 @@ export default function SuperAdminAdminManagementPage() {
                     formErrors.email ? 'border-red-500' : 'border-gray-300'
                   }`}
                 />
-                {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
               </div>
 
               <div>

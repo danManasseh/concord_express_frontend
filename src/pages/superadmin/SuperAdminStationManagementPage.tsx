@@ -8,6 +8,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface StationFormData {
   code: string;
   name: string;
+  region: string;
   address: string;
   contact_phone: string;
 }
@@ -27,6 +28,7 @@ export default function SuperAdminStationManagementPage() {
   const [formData, setFormData] = useState<StationFormData>({
     code: '',
     name: '',
+    region: '',
     address: '',
     contact_phone: '',
   });
@@ -59,6 +61,7 @@ export default function SuperAdminStationManagementPage() {
     setFormData({
       code: '',
       name: '',
+      region: '',
       address: '',
       contact_phone: '',
     });
@@ -72,6 +75,7 @@ export default function SuperAdminStationManagementPage() {
     setFormData({
       code: station.code,
       name: station.name,
+      region: station.region,
       address: station.address,
       contact_phone: station.contact_phone || '',
     });
@@ -85,6 +89,7 @@ export default function SuperAdminStationManagementPage() {
     setFormData({
       code: '',
       name: '',
+      region: '',
       address: '',
       contact_phone: '',
     });
@@ -544,7 +549,37 @@ export default function SuperAdminStationManagementPage() {
                 />
                 {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
               </div>
-
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Region *
+                </label>
+                <select
+                  value={formData.region}
+                  onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                  className={`w-full px-4 ${isMobile ? 'py-3 text-base' : 'py-2'} border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    formErrors.region ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Select a region</option>
+                  <option value="greater_accra">Greater Accra</option>
+                  <option value="ashanti">Ashanti</option>
+                  <option value="western">Western</option>
+                  <option value="central">Central</option>
+                  <option value="eastern">Eastern</option>
+                  <option value="volta">Volta</option>
+                  <option value="northern">Northern</option>
+                  <option value="upper_east">Upper East</option>
+                  <option value="upper_west">Upper West</option>
+                  <option value="bono">Bono</option>
+                  <option value="bono_east">Bono East</option>
+                  <option value="ahafo">Ahafo</option>
+                  <option value="western_north">Western North</option>
+                  <option value="savannah">Savannah</option>
+                  <option value="north_east">North East</option>
+                  <option value="oti">Oti</option>
+                </select>
+                {formErrors.region && <p className="text-red-500 text-xs mt-1">{formErrors.region}</p>}
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
                 <textarea

@@ -3,6 +3,9 @@ import { Parcel, ParcelDetail, CreateParcelRequest } from '@/types/parcel.types'
 import { PaginatedResponse } from '@/types/api.types';
 
 class ParcelService {
+  // updateParcel(trackingId: string, updateData: any) {
+  //   throw new Error('Method not implemented.');
+  // }
   /**
    * Create a new parcel
    */
@@ -84,6 +87,34 @@ class ParcelService {
       throw new Error(handleApiError(error));
     }
   }
-}
+  /**
+ * Update parcel details (admin only)
+ * PUT /api/parcels/:id/
+ */
+  async updateParcel(trackingId: string, data: Partial<{
+    sender_name: string;
+    sender_phone: string;
+    sender_address: string;
+    recipient_name: string;
+    recipient_phone: string;
+    recipient_address: string;
+    destination_station: string;
+    description: string;
+    item_count: number;
+    weight: number | null;
+    declared_value: number;
+    delivery_type: string;
+    payment_status: string;
+    payment_responsibility: string;
+  }>): Promise<ParcelDetail> {
+    try {
+      const response = await api.put<ParcelDetail>(`/parcels/${trackingId}/`, data);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  }
+  }
+
 
 export default new ParcelService();

@@ -5,6 +5,7 @@ import { Station } from '@/types/user.types';
 export interface CreateStationRequest {
   code: string;
   name: string;
+  region: string;
   address: string;
   contact_phone?: string;
 }

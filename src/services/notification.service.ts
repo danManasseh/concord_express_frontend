@@ -1,3 +1,4 @@
+import { PaginatedResponse } from '@/types/api.types';
 import api, { handleApiError } from './api';
 
 export interface Notification {
@@ -46,8 +47,8 @@ class NotificationService {
     page?: number;
   }): Promise<Notification[]> {
     try {
-      const response = await api.get<Notification[]>('/notifications/', { params });
-      return response.data;
+      const response = await api.get<PaginatedResponse<Notification>>('/notifications/', { params });
+      return response.data.results;
     } catch (error) {
       throw new Error(handleApiError(error));
     }

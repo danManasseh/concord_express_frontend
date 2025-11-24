@@ -23,11 +23,11 @@ export interface User {
   updated_at: string;
 }
 
-
 export interface Station {
   id: number;
   code: string;
   name: string;
+  region: string;
   address: string;
   contact_phone: string | null;
   is_active: boolean;

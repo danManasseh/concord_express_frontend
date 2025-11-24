@@ -48,7 +48,7 @@ class PaymentService {
    */
   async getParcelPayments(parcelId: string): Promise<Payment[]> {
     try {
-     const response = await api.get<PaginatedResponse<Payment>>(
+      const response = await api.get<PaginatedResponse<Payment>>(
       `/parcels/${parcelId}/payment/`
     );
       return response.data.results;

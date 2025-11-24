@@ -30,7 +30,6 @@ import {
   Clock,
   CheckCircle,
 } from 'lucide-react';
-import SuperAdminHeader from '@/components/SuperAdminHeader';
 import { useAuthStore } from '@/stores/authStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import parcelService from '@/services/parcel.service';
@@ -38,6 +37,7 @@ import stationService from '@/services/station.service';
 import { Parcel } from '@/types/parcel.types';
 import { Station } from '@/types/user.types';
 import { useToast } from '@/hooks/use-toast';
+import SuperAdminHeader from '@/components/superadmin/SuperAdminHeader';
 
 export default function SuperAdminGlobalParcelOverviewPage() {
   const navigate = useNavigate();
@@ -190,7 +190,6 @@ export default function SuperAdminGlobalParcelOverviewPage() {
   return (
     <div className="min-h-screen bg-background">
       <SuperAdminHeader adminData={user} notificationCount={0} />
-
       {/* Main Content */}
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
@@ -385,7 +384,7 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                       <div>
                         <p className="text-xs text-muted-foreground">Amount</p>
                         <p className="text-foreground">
-                          {parcel.amount ? `GHS ${parcel.amount.toFixed(2)}` : 'N/A'}
+                          {parcel.delivery_fee ? `GHS ${parseFloat(parcel.delivery_fee).toFixed(2)}` : 'N/A'}
                         </p>
                       </div>
                       <div>
@@ -445,7 +444,7 @@ export default function SuperAdminGlobalParcelOverviewPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {parcel.amount ? `GHS ${parcel.amount.toFixed(2)}` : 'N/A'}
+                          {parcel.delivery_fee ? `GHS ${parseFloat(parcel.delivery_fee).toFixed(2)}` : 'N/A'}
                         </TableCell>
                         <TableCell>
                           <Badge

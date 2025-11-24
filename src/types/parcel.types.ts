@@ -23,6 +23,7 @@ export interface Parcel {
   item_count: number;
   weight: string | null;
   declared_value: string;
+  delivery_fee: string | null;  
   delivery_type: DeliveryType;
   status: ParcelStatus;
   payment_status: PaymentStatus;

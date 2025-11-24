@@ -254,7 +254,7 @@ export default function SuperAdminAnalyticsDashboardPage() {
                   <SelectContent>
                     <SelectItem value="all">All Stations</SelectItem>
                     {stations.map((station) => (
-                      <SelectItem key={station.id} value={station.id}>
+                      <SelectItem key={station.id} value={`${station.id}`}>
                         {station.name}
                       </SelectItem>
                     ))}
