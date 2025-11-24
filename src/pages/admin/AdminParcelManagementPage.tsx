@@ -112,49 +112,58 @@ export default function AdminParcelManagementPage() {
   };
 
   // Smart "next action" logic based on station and status
-  const getNextStatusAction = (parcel: Parcel) => {
-    const currentStation = user?.station?.id;
-    const isOriginStation = parcel.origin_station === currentStation;
-    const isDestinationStation = parcel.destination_station === currentStation;
+  const getNextStatusAction = (
+  parcel: Parcel
+): { label: string; newStatus: 'created' | 'in_transit' | 'arrived' | 'delivered' | 'failed' } | null => {
+  const currentStation = user?.station?.id;
+  const isOriginStation = parcel.origin_station === String(currentStation);
+  const isDestinationStation = parcel.destination_station === String(currentStation);
 
-    // Only allow status updates if payment is paid
-    if (parcel.payment_status !== 'paid') {
-      return null;
-    }
-
-    switch (parcel.status) {
-      case 'created':
-        if (isOriginStation) return { label: 'Mark In Transit', newStatus: 'in_transit' };
-        break;
-      case 'in_transit':
-        if (isDestinationStation) return { label: 'Mark as Arrived', newStatus: 'arrived' };
-        break;
-      case 'arrived':
-        if (isDestinationStation) return { label: 'Mark as Delivered', newStatus: 'delivered' };
-        break;
-      default:
-        return null;
-    }
+  // Only allow status updates if payment is paid
+  if (parcel.payment_status !== 'paid') {
     return null;
-  };
+  }
 
-  const updateParcelStatus = async (parcelId: string, newStatus: string) => {
-    try {
-      // Call API to update status
-      // await parcelService.updateParcelStatus(parcelId, newStatus);
-      
-      // Update local state
-      setParcels(prevParcels =>
-        prevParcels.map(p =>
-          p.id === parcelId ? { ...p, status: newStatus as any } : p
-        )
-      );
-      
-      console.log(`Parcel ${parcelId} status updated to ${newStatus}`);
-    } catch (err) {
-      console.error('Failed to update status:', err);
-    }
-  };
+  switch (parcel.status) {
+    case 'created':
+      if (isOriginStation) return { label: 'Mark In Transit', newStatus: 'in_transit' };
+      break;
+    case 'in_transit':
+      if (isDestinationStation) return { label: 'Mark as Arrived', newStatus: 'arrived' };
+      break;
+    case 'arrived':
+      if (isDestinationStation) return { label: 'Mark as Delivered', newStatus: 'delivered' };
+      break;
+    default:
+      return null;
+  }
+  return null;
+};
+
+  const updateParcelStatus = async (
+  parcelId: string, 
+  newStatus: 'created' | 'in_transit' | 'arrived' | 'delivered' | 'failed',
+  notes?: string
+) => {
+  try {
+    // Call API to update status - pass an object with new_status and notes
+    await parcelService.updateParcelStatus(parcelId, {
+      new_status: newStatus,
+      notes: notes || `Status updated to ${newStatus.replace('_', ' ')}`
+    });
+    
+    // Update local state
+    setParcels(prevParcels =>
+      prevParcels.map(p =>
+        p.id === parcelId ? { ...p, status: newStatus } : p
+      )
+    );
+    
+    console.log(`Parcel ${parcelId} status updated to ${newStatus}`);
+  } catch (err) {
+    console.error('Failed to update status:', err);
+  }
+};
 
   return (
     <div className="min-h-screen bg-background">
@@ -395,7 +404,7 @@ export default function AdminParcelManagementPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={() => navigate(`/admin/parcels/${parcel.tracking_code}`)}
+                              onClick={() => navigate(`/parcels/${parcel.id}`)}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>

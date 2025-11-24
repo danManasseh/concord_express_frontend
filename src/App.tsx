@@ -27,6 +27,7 @@ import SuperAdminAnalyticsReportsPage from './pages/superadmin/SuperAdminAnalyti
 import SuperAdminUserOverviewPage from './pages/superadmin/SuperAdminUserOverviewPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import { Toaster } from './components/ui/toaster';
+import AdminPaymentDetailsPage from './pages/admin/AdminPaymentDetailsPage';
 
 function App() {
   return (
@@ -99,9 +100,9 @@ function App() {
         />
 
         <Route
-          path="/admin/parcels/:trackingId"
+          path="/parcels/:parcelId"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
               <AdminParcelDetailsPage />
             </ProtectedRoute>
           }
@@ -137,6 +138,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminPaymentRecordsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/payments/:paymentId"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminPaymentDetailsPage />
             </ProtectedRoute>
           }
         />

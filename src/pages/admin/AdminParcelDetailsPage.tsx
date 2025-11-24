@@ -31,7 +31,7 @@ interface EditableFields {
 
 export default function AdminParcelDetailsPage() {
   const navigate = useNavigate();
-  const { trackingId } = useParams<{ trackingId: string }>();
+  const { parcelId } = useParams<{ parcelId: string }>();
   const { user } = useAuthStore();
   const { toast } = useToast();
 
@@ -41,6 +41,7 @@ export default function AdminParcelDetailsPage() {
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [editedFields, setEditedFields] = useState<EditableFields | null>(null);
 
   // Redirect if not admin
@@ -53,11 +54,11 @@ export default function AdminParcelDetailsPage() {
   // Fetch parcel details and stations
   useEffect(() => {
     const fetchData = async () => {
-      if (!trackingId) return;
+      if (!parcelId) return;
 
       try {
         const [parcelData, stationsData] = await Promise.all([
-          parcelService.trackParcel(trackingId),
+          parcelService.getParcelDetail(parcelId),
           stationService.getStations(),
         ]);
         setParcel(parcelData);
@@ -88,7 +89,7 @@ export default function AdminParcelDetailsPage() {
     };
 
     fetchData();
-  }, [trackingId]);
+  }, [parcelId]);
 
   if (!user) return null;
 
@@ -105,7 +106,7 @@ export default function AdminParcelDetailsPage() {
     }
 
     // Destination admin can edit if status is 'arrived'
-    if (parcel.status === 'arrived' && String(user.station.id )=== parcel.destination_station) {
+    if (parcel.status === 'arrived' && String(user.station.id) === parcel.destination_station) {
       return true;
     }
 
@@ -118,7 +119,6 @@ export default function AdminParcelDetailsPage() {
 
     // If status is 'created' and user is origin admin
     if (parcel.status === 'created' && String(user.station.id) === parcel.origin_station) {
-      // Can edit all fields except some restrictions
       return true;
     }
 
@@ -129,6 +129,35 @@ export default function AdminParcelDetailsPage() {
     }
 
     return false;
+  };
+
+  // Get next status action based on permissions
+  const getNextStatusAction = (): { label: string; newStatus: 'created' | 'in_transit' | 'arrived' | 'delivered' | 'failed' } | null => {
+    if (!parcel || !user.station) return null;
+
+    const currentStation = user.station.id;
+    const isOriginStation = parcel.origin_station === String(currentStation);
+    const isDestinationStation = parcel.destination_station === String(currentStation);
+
+    // Only allow status updates if payment is paid
+    if (parcel.payment_status !== 'paid') {
+      return null;
+    }
+
+    switch (parcel.status) {
+      case 'created':
+        if (isOriginStation) return { label: 'Mark In Transit', newStatus: 'in_transit' };
+        break;
+      case 'in_transit':
+        if (isDestinationStation) return { label: 'Mark as Arrived', newStatus: 'arrived' };
+        break;
+      case 'arrived':
+        if (isDestinationStation) return { label: 'Mark as Delivered', newStatus: 'delivered' };
+        break;
+      default:
+        return null;
+    }
+    return null;
   };
 
   const handleEdit = () => {
@@ -159,7 +188,7 @@ export default function AdminParcelDetailsPage() {
   };
 
   const handleSave = async () => {
-    if (!parcel || !editedFields || !trackingId) return;
+    if (!parcel || !editedFields) return;
 
     try {
       setIsSaving(true);
@@ -183,8 +212,27 @@ export default function AdminParcelDetailsPage() {
       if (editedFields.payment_responsibility !== parcel.payment_responsibility) updateData.payment_responsibility = editedFields.payment_responsibility;
 
       // Update parcel
-      const updatedParcel = await parcelService.updateParcel(trackingId, updateData);
+      const updatedParcel = await parcelService.updateParcel(parcel.id, updateData);
       setParcel(updatedParcel);
+      
+      // Update editedFields with new values
+      setEditedFields({
+        sender_name: updatedParcel.sender_name,
+        sender_phone: updatedParcel.sender_phone,
+        sender_address: updatedParcel.sender_address,
+        recipient_name: updatedParcel.recipient_name,
+        recipient_phone: updatedParcel.recipient_phone,
+        recipient_address: updatedParcel.recipient_address,
+        destination_station: updatedParcel.destination_station,
+        description: updatedParcel.description,
+        item_count: updatedParcel.item_count,
+        weight: updatedParcel.weight || '',
+        declared_value: updatedParcel.declared_value,
+        delivery_type: updatedParcel.delivery_type,
+        payment_status: updatedParcel.payment_status || 'unpaid',
+        payment_responsibility: updatedParcel.payment_responsibility,
+      });
+      
       setIsEditing(false);
 
       toast({
@@ -199,6 +247,47 @@ export default function AdminParcelDetailsPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!parcel) return;
+
+    const statusAction = getNextStatusAction();
+    if (!statusAction) return;
+
+    try {
+      setIsUpdatingStatus(true);
+      
+      await parcelService.updateParcelStatus(parcel.id, {
+        new_status: statusAction.newStatus,
+        notes: `Status updated by ${user.name}`
+      });
+      
+      // Refresh parcel data
+      const updatedParcel = await parcelService.getParcelDetail(parcel.id);
+      setParcel(updatedParcel);
+      
+      // Update editedFields
+      if (editedFields) {
+        setEditedFields({
+          ...editedFields,
+          payment_status: updatedParcel.payment_status || 'unpaid',
+        });
+      }
+      
+      toast({
+        title: 'Success',
+        description: 'Parcel status updated successfully',
+      });
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Failed to update status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -599,6 +688,32 @@ export default function AdminParcelDetailsPage() {
 
               {/* Sidebar */}
               <div className="space-y-6">
+                {/* Status Update Action */}
+                {getNextStatusAction() && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Update Status</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Button
+                        className="w-full"
+                        onClick={handleUpdateStatus}
+                        disabled={isUpdatingStatus}
+                      >
+                        {isUpdatingStatus ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : null}
+                        {getNextStatusAction()!.label}
+                      </Button>
+                      {parcel.payment_status !== 'paid' && (
+                        <p className="text-xs text-muted-foreground">
+                          Payment must be completed before updating status
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Status & Payment */}
                 <Card>
                   <CardHeader>
@@ -610,15 +725,6 @@ export default function AdminParcelDetailsPage() {
                       <Badge className={`${getStatusColor(parcel.status)} px-3 py-1`}>
                         {parcel.status.replace('_', ' ').toUpperCase()}
                       </Badge>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {parcel.status === 'created' && String(user.station?.id) === parcel.origin_station
-                          ? 'You can update status to In Transit'
-                          : parcel.status === 'in_transit' && String(user.station?.id) === parcel.destination_station
-                          ? 'You can update status to Arrived'
-                          : parcel.status === 'arrived' && String(user.station?.id) === parcel.destination_station
-                          ? 'You can update status to Delivered'
-                          : 'Only relevant admin can update status'}
-                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-2">Payment Status</p>
@@ -626,7 +732,7 @@ export default function AdminParcelDetailsPage() {
                         <select
                           value={editedFields.payment_status}
                           onChange={(e) => setEditedFields({ ...editedFields, payment_status: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md mb-2"
+                          className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input appearance-auto"
                         >
                           <option value="unpaid">Unpaid</option>
                           <option value="pending">Pending</option>
@@ -637,25 +743,25 @@ export default function AdminParcelDetailsPage() {
                           {(parcel.payment_status || 'unpaid').toUpperCase()}
                         </Badge>
                       )}
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground mb-1">Payment Responsibility</p>
-                        {isEditing && canEditField('payment_responsibility') ? (
-                          <select
-                            value={editedFields.payment_responsibility}
-                            onChange={(e) => setEditedFields({ ...editedFields, payment_responsibility: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-md text-sm"
-                          >
-                            <option value="sender">Sender Pays</option>
-                            <option value="recipient">Recipient Pays</option>
-                          </select>
-                        ) : (
-                          <p className="text-sm capitalize">{parcel.payment_responsibility} pays</p>
-                        )}
-                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Payment Responsibility</p>
+                      {isEditing && canEditField('payment_responsibility') ? (
+                        <select
+                          value={editedFields.payment_responsibility}
+                          onChange={(e) => setEditedFields({ ...editedFields, payment_responsibility: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input appearance-auto"
+                        >
+                          <option value="sender">Sender Pays</option>
+                          <option value="recipient">Recipient Pays</option>
+                        </select>
+                      ) : (
+                        <p className="text-sm capitalize">{parcel.payment_responsibility} pays</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
-
+              
                 {/* Quick Actions */}
                 <Card>
                   <CardHeader>

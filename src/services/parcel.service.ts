@@ -3,9 +3,26 @@ import { Parcel, ParcelDetail, CreateParcelRequest } from '@/types/parcel.types'
 import { PaginatedResponse } from '@/types/api.types';
 
 class ParcelService {
-  // updateParcel(trackingId: string, updateData: any) {
-  //   throw new Error('Method not implemented.');
-  // }
+  /**
+   * Update parcel status with audit trail
+   * PUT /api/parcels/:id/status
+   */
+  async updateParcelStatus(
+    parcelId: String,
+    data: {
+      new_status: 'created' | 'in_transit' | 'arrived' | 'delivered' | 'failed';
+      notes?: string;
+    }
+  ): Promise<ParcelDetail>{
+    try {
+      const response = await api.put<ParcelDetail>(`/parcels/${parcelId}/status/`, data);
+      return response.data;
+    } catch (error) {
+        throw new Error(handleApiError(error));
+      }
+  }
+
+
   /**
    * Create a new parcel
    */
@@ -21,14 +38,14 @@ class ParcelService {
   /**
    * Get parcel by tracking code (public)
    */
-  async trackParcel(trackingCode: string): Promise<ParcelDetail> {
-    try {
-      const response = await api.get<ParcelDetail>(`/track/${trackingCode}/`);
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error));
-    }
-  }
+  // async trackParcel(trackingCode: string): Promise<ParcelDetail> {
+  //   try {
+  //     const response = await api.get<ParcelDetail>(`/track/${trackingCode}/`);
+  //     return response.data;
+  //   } catch (error) {
+  //     throw new Error(handleApiError(error));
+  //   }
+  // }
 
   /**
    * Get user's parcels
@@ -61,9 +78,9 @@ class ParcelService {
   /**
    * Get parcel details
    */
-  async getParcelDetail(id: string): Promise<ParcelDetail> {
+  async getParcelDetail(parcelId: string): Promise<ParcelDetail> {
     try {
-      const response = await api.get<ParcelDetail>(`/parcels/${id}/`);
+      const response = await api.get<ParcelDetail>(`/parcels/${parcelId}/`);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
@@ -87,11 +104,13 @@ class ParcelService {
       throw new Error(handleApiError(error));
     }
   }
-  /**
+/**
  * Update parcel details (admin only)
  * PUT /api/parcels/:id/
  */
-  async updateParcel(trackingId: string, data: Partial<{
+async updateParcel(
+  parcelId: string,  // ← This should be the UUID, not tracking code
+  data: Partial<{
     sender_name: string;
     sender_phone: string;
     sender_address: string;
@@ -106,14 +125,15 @@ class ParcelService {
     delivery_type: string;
     payment_status: string;
     payment_responsibility: string;
-  }>): Promise<ParcelDetail> {
-    try {
-      const response = await api.put<ParcelDetail>(`/parcels/${trackingId}/`, data);
-      return response.data;
-    } catch (error) {
-      throw new Error(handleApiError(error));
-    }
+  }>
+): Promise<ParcelDetail> {
+  try {
+    const response = await api.put<ParcelDetail>(`/parcels/${parcelId}/`, data);
+    return response.data;
+  } catch (error) {
+    throw new Error(handleApiError(error));
   }
+}
   }
 
 
